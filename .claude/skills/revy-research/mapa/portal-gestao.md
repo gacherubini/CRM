@@ -1,6 +1,6 @@
-# portal-gestao · 181 rotas · 26 modelos · 6 workers · 35 flags · 27 migrations · 63 templates
+# portal-gestao · 182 rotas · 26 modelos · 6 workers · 37 flags · 27 migrations · 63 templates
 
-Gerado de `347396c`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `2563e8b`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0027_perfil_avatar_foto`
 
 ## Rotas
@@ -8,15 +8,16 @@ Migration head: `0027_perfil_avatar_foto`
 - `GET /app/loja/atendimento` — app/loja/routes.py:193
 - `GET /app/loja/agente` — app/loja/routes.py:409
 - `GET /app/loja/atendimento/{workspace_id}` — app/loja/routes.py:460
-- `GET /app/loja/atendimento/{workspace_id}/mensagens.json` — app/loja/routes.py:752
-- `POST /app/loja/atendimento/{workspace_id}/mensagem` — app/loja/routes.py:861
-- `POST /app/loja/atendimento/{workspace_id}/handoff` — app/loja/routes.py:982
-- `POST /app/loja/atendimento/{workspace_id}/etapa` — app/loja/routes.py:1061
-- `GET /app/loja/agente/configuracao` — app/loja/routes.py:1207
-- `PUT /app/loja/agente/configuracao.json` — app/loja/routes.py:1237
-- `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1278
-- `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1321
-- `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1343
+- `GET /app/loja/atendimento/{workspace_id}/mensagens.json` — app/loja/routes.py:811
+- `POST /app/loja/atendimento/{workspace_id}/mensagem` — app/loja/routes.py:920
+- `POST /app/loja/atendimento/{workspace_id}/audio` — app/loja/routes.py:1041
+- `POST /app/loja/atendimento/{workspace_id}/handoff` — app/loja/routes.py:1158
+- `POST /app/loja/atendimento/{workspace_id}/etapa` — app/loja/routes.py:1237
+- `GET /app/loja/agente/configuracao` — app/loja/routes.py:1383
+- `PUT /app/loja/agente/configuracao.json` — app/loja/routes.py:1413
+- `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1454
+- `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1497
+- `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1519
 - `GET /health/live` — app/main.py:583
 - `GET /health/ready` — app/main.py:588
 - `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:597
@@ -236,27 +237,29 @@ Migration head: `0027_perfil_avatar_foto`
 - `REVY_LOJA_AGENTE_CONFIG_ENABLED (default: 0)` — app/config.py:63
 - `REVY_LOJA_REDIRECT_LEGACY (default: 0)` — app/config.py:72
 - `SELLER_AI_ENABLED (default: 0)` — app/config.py:77
-- `PORTAL_META_SPEND_SYNC_ENABLED (default: 1)` — app/config.py:167
-- `REVY_TRAFEGO_URL` — app/config.py:182
-- `REVY_TRAFEGO_SERVICE_TOKEN (default: '')` — app/config.py:185
-- `REVY_TRAFEGO_EMAIL_BACKEND (default: console)` — app/config.py:213
-- `REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)` — app/config.py:217
-- `REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy)` — app/config.py:221
-- `REVY_TRAFEGO_SMTP_HOST (default: '')` — app/config.py:224
-- `REVY_TRAFEGO_SMTP_PORT (default: 587)` — app/config.py:227
-- `REVY_TRAFEGO_SMTP_USERNAME (default: '')` — app/config.py:230
-- `REVY_TRAFEGO_SMTP_PASSWORD (default: '')` — app/config.py:233
-- `REVY_TRAFEGO_SMTP_USE_TLS (default: 1)` — app/config.py:236
-- `REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')` — app/config.py:240
-- `REVY_LOJA_COPILOTO_LLM_URL (default: https://api.deepseek.com)` — app/config.py:264
-- `REVY_LOJA_COPILOTO_LLM_KEY (default: '')` — app/config.py:266
-- `REVY_LOJA_COPILOTO_LLM_MODEL (default: DeepSeek-V4-Flash-0731)` — app/config.py:268
-- `REVY_LOJA_COPILOTO_LLM_TIMEOUT (default: 40)` — app/config.py:271
-- `REVY_LOJA_COPILOTO_LLM_RETRIES (default: 1)` — app/config.py:273
-- `REVY_LOJA_COPILOTO_HISTORICO_TOKENS (default: 2000)` — app/config.py:278
-- `REVY_LOJA_COPILOTO_FIPE_URL (default: https://parallelum.com.br/fipe/api/v1)` — app/config.py:290
-- `REVY_LOJA_COPILOTO_FIPE_TIMEOUT (default: 8)` — app/config.py:293
-- `REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS (default: 21600)` — app/config.py:297
+- `REVY_LOJA_AUDIO_MAX_BYTES` — app/config.py:163
+- `REVY_LOJA_AUDIO_MAX_DURATION_SECONDS (default: 180)` — app/config.py:166
+- `PORTAL_META_SPEND_SYNC_ENABLED (default: 1)` — app/config.py:176
+- `REVY_TRAFEGO_URL` — app/config.py:191
+- `REVY_TRAFEGO_SERVICE_TOKEN (default: '')` — app/config.py:194
+- `REVY_TRAFEGO_EMAIL_BACKEND (default: console)` — app/config.py:222
+- `REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)` — app/config.py:226
+- `REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy)` — app/config.py:230
+- `REVY_TRAFEGO_SMTP_HOST (default: '')` — app/config.py:233
+- `REVY_TRAFEGO_SMTP_PORT (default: 587)` — app/config.py:236
+- `REVY_TRAFEGO_SMTP_USERNAME (default: '')` — app/config.py:239
+- `REVY_TRAFEGO_SMTP_PASSWORD (default: '')` — app/config.py:242
+- `REVY_TRAFEGO_SMTP_USE_TLS (default: 1)` — app/config.py:245
+- `REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')` — app/config.py:249
+- `REVY_LOJA_COPILOTO_LLM_URL (default: https://api.deepseek.com)` — app/config.py:273
+- `REVY_LOJA_COPILOTO_LLM_KEY (default: '')` — app/config.py:275
+- `REVY_LOJA_COPILOTO_LLM_MODEL (default: DeepSeek-V4-Flash-0731)` — app/config.py:277
+- `REVY_LOJA_COPILOTO_LLM_TIMEOUT (default: 40)` — app/config.py:280
+- `REVY_LOJA_COPILOTO_LLM_RETRIES (default: 1)` — app/config.py:282
+- `REVY_LOJA_COPILOTO_HISTORICO_TOKENS (default: 2000)` — app/config.py:287
+- `REVY_LOJA_COPILOTO_FIPE_URL (default: https://parallelum.com.br/fipe/api/v1)` — app/config.py:299
+- `REVY_LOJA_COPILOTO_FIPE_TIMEOUT (default: 8)` — app/config.py:302
+- `REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS (default: 21600)` — app/config.py:306
 - `PORTAL_COPILOTO_PURGE_ENABLED (default: True)` — app/copiloto_purge_job.py:171
 - `PORTAL_COPILOTO_SINAIS_ENABLED (default: True)` — app/copiloto_sinais_job.py:442
 - `PORTAL_COPILOTO_TURNOS_ENABLED (default: True)` — app/copiloto_turnos_job.py:241
@@ -298,8 +301,8 @@ Migration head: `0027_perfil_avatar_foto`
 - `app/templates/erro.html` — app/loja/routes.py:112
 - `app/templates/loja/atendimento_lista.html` — app/loja/routes.py:279
 - `app/templates/loja/agente.html` — app/loja/routes.py:438
-- `app/templates/loja/atendimento_workspace.html` — app/loja/routes.py:551
-- `app/templates/loja/agente_configuracao.html` — app/loja/routes.py:1225
+- `app/templates/loja/atendimento_workspace.html` — app/loja/routes.py:555
+- `app/templates/loja/agente_configuracao.html` — app/loja/routes.py:1401
 - `app/templates/login.html` — app/main.py:641
 - `app/templates/dashboard.html` — app/main.py:828
 - `app/templates/estoque/lista.html` — app/main.py:872

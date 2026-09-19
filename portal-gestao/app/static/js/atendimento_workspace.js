@@ -101,7 +101,11 @@
       knownIds[id] = true;
       lastId = id;
     }
-    bolha.appendChild(document.createTextNode(msg.texto || "—"));
+    if (msg.tipo === "audio") {
+      bolha.appendChild(document.createTextNode("Áudio"));
+    } else {
+      bolha.appendChild(document.createTextNode(msg.texto || "—"));
+    }
     var small = document.createElement("small");
     small.textContent = formatHorario(msg.criada_em);
     bolha.appendChild(small);
@@ -287,8 +291,206 @@
     }
   }
 
+  // ---- Áudio do Vendedor (só Modo 2; o servidor decide e o template esconde) ----
+  function initAudio() {
+    var audioRoot = root.querySelector("[data-audio]");
+    if (!audioRoot || typeof MediaRecorder === "undefined") return;
+    var startBtn = audioRoot.querySelector("[data-audio-start]");
+    var stopBtn = audioRoot.querySelector("[data-audio-stop]");
+    var cancelBtn = audioRoot.querySelector("[data-audio-cancel]");
+    var sendBtn = audioRoot.querySelector("[data-audio-send]");
+    var timeEl = audioRoot.querySelector("[data-audio-time]");
+    var preview = audioRoot.querySelector("[data-audio-preview]");
+    var statusEl = audioRoot.querySelector("[data-audio-status]");
+    var url = audioRoot.getAttribute("data-audio-url") || "";
+    var maxSeg = parseInt(audioRoot.getAttribute("data-audio-max") || "180", 10);
+    if (!isFinite(maxSeg) || maxSeg <= 0) maxSeg = 180;
+
+    var recorder = null;
+    var chunks = [];
+    var stream = null;
+    var blob = null;
+    var timer = null;
+    var startedAt = 0;
+    var audioSending = false;
+
+    function setStatus(msg, kind) {
+      if (!statusEl) return;
+      statusEl.textContent = msg || "";
+      statusEl.className = "muted" + (kind ? " " + kind : "");
+    }
+    function show(el, on) {
+      if (el) el.hidden = !on;
+    }
+    function fmt(seg) {
+      var m = Math.floor(seg / 60);
+      var s = seg % 60;
+      return m + ":" + (s < 10 ? "0" : "") + s;
+    }
+    function stopTracks() {
+      if (!stream) return;
+      stream.getTracks().forEach(function (t) {
+        t.stop();
+      });
+      stream = null;
+    }
+    function reset() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      recorder = null;
+      chunks = [];
+      blob = null;
+      if (preview) {
+        preview.pause();
+        preview.removeAttribute("src");
+        preview.load();
+      }
+      show(startBtn, true);
+      show(stopBtn, false);
+      show(cancelBtn, false);
+      show(sendBtn, false);
+      show(preview, false);
+      show(timeEl, false);
+    }
+    function start() {
+      if (audioSending) return;
+      setStatus("Pedindo o microfone…");
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then(function (s) {
+          stream = s;
+          chunks = [];
+          try {
+            recorder = new MediaRecorder(s);
+          } catch (e) {
+            recorder = new MediaRecorder(s, { mimeType: "audio/webm" });
+          }
+          recorder.addEventListener("dataavailable", function (ev) {
+            if (ev.data && ev.data.size) chunks.push(ev.data);
+          });
+          recorder.addEventListener("stop", function () {
+            blob = new Blob(chunks, {
+              type: (recorder && recorder.mimeType) || "audio/webm",
+            });
+            if (preview) preview.src = URL.createObjectURL(blob);
+            show(preview, true);
+            show(sendBtn, true);
+            show(cancelBtn, true);
+            stopTracks();
+          });
+          recorder.start();
+          startedAt = Date.now();
+          if (timeEl) timeEl.textContent = "0:00";
+          show(timeEl, true);
+          show(startBtn, false);
+          show(stopBtn, true);
+          setStatus("Gravando…");
+          timer = setInterval(function () {
+            var seg = Math.floor((Date.now() - startedAt) / 1000);
+            if (timeEl) timeEl.textContent = fmt(seg);
+            if (seg >= maxSeg) stop();
+          }, 500);
+        })
+        .catch(function () {
+          setStatus("Não foi possível acessar o microfone.", "warn");
+        });
+    }
+    function stop() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      if (recorder && recorder.state !== "inactive") {
+        try {
+          recorder.stop();
+        } catch (e) {}
+      }
+      show(stopBtn, false);
+      setStatus("Revise e envie.");
+    }
+    function cancel() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      if (recorder && recorder.state !== "inactive") {
+        try {
+          recorder.stop();
+        } catch (e) {}
+      }
+      stopTracks();
+      reset();
+      setStatus("");
+    }
+    function send() {
+      if (!blob || audioSending) return;
+      if (typeof fetch !== "function") {
+        setStatus("Envio indisponível neste navegador.", "warn");
+        return;
+      }
+      var csrf = form ? form.querySelector('input[name="csrf"]') : null;
+      var canal = form ? form.querySelector('input[name="canal_id"]') : null;
+      var body = new FormData();
+      body.append("arquivo", blob, "voz.webm");
+      if (csrf) body.append("csrf", csrf.value);
+      if (canal) body.append("canal_id", canal.value);
+      body.append("idempotency_key", newIdempotencyKey());
+      body.append(
+        "duracao_segundos",
+        String(Math.max(1, Math.round((Date.now() - startedAt) / 1000)))
+      );
+      audioSending = true;
+      if (sendBtn) sendBtn.disabled = true;
+      setStatus("Enviando áudio…");
+      fetch(url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: body,
+      })
+        .then(function (res) {
+          return res.json().then(function (data) {
+            return { status: res.status, data: data };
+          });
+        })
+        .then(function (pack) {
+          var data = pack.data || {};
+          if (!data.ok) {
+            setStatus(data.message || "Não foi possível enviar o áudio.", "warn");
+            return;
+          }
+          if (data.mensagem) appendMensagem(data.mensagem, { forceScroll: true });
+          var botBadge = document.querySelector("[data-bot-status]");
+          if (botBadge && data.bot_ativo === false) {
+            botBadge.textContent = "Pausado (humano)";
+            botBadge.className = "status em_atendimento";
+          }
+          reset();
+          setStatus(data.duplicada ? "Áudio já enviado." : "Áudio enviado.", "ok");
+        })
+        .catch(function () {
+          setStatus("Não foi possível enviar o áudio agora.", "warn");
+        })
+        .finally(function () {
+          audioSending = false;
+          if (sendBtn) sendBtn.disabled = false;
+        });
+    }
+
+    if (startBtn) startBtn.addEventListener("click", start);
+    if (stopBtn) stopBtn.addEventListener("click", stop);
+    if (cancelBtn) cancelBtn.addEventListener("click", cancel);
+    if (sendBtn) sendBtn.addEventListener("click", send);
+  }
+
   seedFromDom();
   scrollToBottom(true);
+  initAudio();
 
   if (form) {
     ensureIdemField();

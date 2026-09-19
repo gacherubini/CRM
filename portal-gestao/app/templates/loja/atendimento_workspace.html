@@ -86,7 +86,7 @@
       <div class="thread" data-thread role="log" aria-live="polite" aria-relevant="additions">
         {% if workspace.mensagens %}
         {% for m in workspace.mensagens %}
-        <div class="bolha {{ m.direcao }}"{% if m.id %} data-msg-id="{{ m.id }}"{% endif %}>{{ m.texto or '—' }}<small>{% if m.direcao == 'entrada' %}{% if workspace.lead and workspace.lead.nome %}{{ workspace.lead.nome }}{% else %}Cliente{% endif %}{% else %}Equipe{% endif %} · {{ formatar_horario(m.criada_em) }}</small></div>
+        <div class="bolha {{ m.direcao }}"{% if m.id %} data-msg-id="{{ m.id }}"{% endif %}>{% if m.tipo == 'audio' %}Áudio{% else %}{{ m.texto or '—' }}{% endif %}<small>{% if m.direcao == 'entrada' %}{% if workspace.lead and workspace.lead.nome %}{{ workspace.lead.nome }}{% else %}Cliente{% endif %}{% else %}Equipe{% endif %} · {{ formatar_horario(m.criada_em) }}</small></div>
         {% endfor %}
         {% else %}
         <div class="thread-empty" data-thread-empty>
@@ -121,10 +121,25 @@
                   rows="2"
                   placeholder="Escreva a mensagem… (Enter envia, Shift+Enter quebra linha)"
                   required></textarea>
+        {% if pode_audio %}
+        <div class="composer-audio" data-audio
+             data-audio-url="/app/loja/atendimento/{{ workspace.id }}/audio"
+             data-audio-max="{{ audio_max_duracao }}">
+          <button type="button" class="button" data-audio-start>Gravar áudio</button>
+          <span class="audio-timer" data-audio-time hidden>0:00</span>
+          <audio data-audio-preview controls hidden></audio>
+          <button type="button" class="button" data-audio-stop hidden>Parar</button>
+          <button type="button" class="button" data-audio-cancel hidden>Descartar</button>
+          <button type="button" class="button primary" data-audio-send hidden>Enviar áudio</button>
+          <span class="muted" data-audio-status role="status"></span>
+        </div>
+        {% elif audio_motivo %}
+        <p class="muted composer-hint" data-audio-motivo>{{ audio_motivo }}</p>
+        {% endif %}
         <div class="composer-bar">
           <p class="muted composer-hint">
             Sai pelo canal desta conversa{% if workspace.canal_label %} ({{ workspace.canal_label }}){% endif %}.
-            O envio pausa o bot. Só texto por enquanto.
+            O envio pausa o bot.
           </p>
           <button class="button primary" type="submit" data-composer-submit>Enviar</button>
         </div>

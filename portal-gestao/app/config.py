@@ -156,6 +156,15 @@ class Settings:
         "MOTOR_TOKENS_JSON", os.getenv("MOTOR_API_TOKENS_JSON", "")
     )
     request_timeout: float = float(os.getenv("PORTAL_HTTP_TIMEOUT", "5"))
+    # Áudio sobe bytes e o Chatbot ainda converte/sobe na Meta: 5s não basta.
+    request_timeout_audio: float = float(os.getenv("PORTAL_HTTP_TIMEOUT_AUDIO", "60"))
+    # Espelha o teto do Chatbot; evita carregar arquivo gigante em memória.
+    audio_max_bytes: int = int(
+        os.getenv("REVY_LOJA_AUDIO_MAX_BYTES", str(8 * 1024 * 1024))
+    )
+    audio_max_duration_seconds: int = int(
+        os.getenv("REVY_LOJA_AUDIO_MAX_DURATION_SECONDS", "180")
+    )
     request_retries: int = int(os.getenv("PORTAL_HTTP_RETRIES", "1"))
     request_retry_backoff: float = float(
         os.getenv("PORTAL_HTTP_RETRY_BACKOFF", "0.2")

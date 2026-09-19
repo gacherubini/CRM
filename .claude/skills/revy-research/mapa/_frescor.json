@@ -1,5 +1,5 @@
 {
- "sha": "347396c",
+ "sha": "2563e8b",
  "inventario": {
   "chatbot-api": [
    {
@@ -916,150 +916,164 @@
    },
    {
     "secao": "flag",
+    "chave": "REVY_LOJA_AUDIO_MAX_BYTES",
+    "simbolo": "REVY_LOJA_AUDIO_MAX_BYTES",
+    "arquivo": "app/config.py",
+    "linha": 163
+   },
+   {
+    "secao": "flag",
+    "chave": "REVY_LOJA_AUDIO_MAX_DURATION_SECONDS (default: 180)",
+    "simbolo": "REVY_LOJA_AUDIO_MAX_DURATION_SECONDS",
+    "arquivo": "app/config.py",
+    "linha": 166
+   },
+   {
+    "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_PASSWORD (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_PASSWORD",
     "arquivo": "app/config.py",
-    "linha": 233
+    "linha": 242
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_TIMEOUT (default: 40)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_TIMEOUT",
     "arquivo": "app/config.py",
-    "linha": 271
+    "linha": 280
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_RETRIES (default: 1)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_RETRIES",
     "arquivo": "app/config.py",
-    "linha": 273
+    "linha": 282
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_HISTORICO_TOKENS (default: 2000)",
     "simbolo": "REVY_LOJA_COPILOTO_HISTORICO_TOKENS",
     "arquivo": "app/config.py",
-    "linha": 278
+    "linha": 287
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_FIPE_TIMEOUT (default: 8)",
     "simbolo": "REVY_LOJA_COPILOTO_FIPE_TIMEOUT",
     "arquivo": "app/config.py",
-    "linha": 293
+    "linha": 302
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS (default: 21600)",
     "simbolo": "REVY_LOJA_COPILOTO_FIPE_CACHE_SEGUNDOS",
     "arquivo": "app/config.py",
-    "linha": 297
+    "linha": 306
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SERVICE_TOKEN (default: '')",
     "simbolo": "REVY_TRAFEGO_SERVICE_TOKEN",
     "arquivo": "app/config.py",
-    "linha": 185
+    "linha": 194
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_PORT (default: 587)",
     "simbolo": "REVY_TRAFEGO_SMTP_PORT",
     "arquivo": "app/config.py",
-    "linha": 227
+    "linha": 236
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_KEY (default: '')",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_KEY",
     "arquivo": "app/config.py",
-    "linha": 266
+    "linha": 275
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_MODEL (default: DeepSeek-V4-Flash-0731)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_MODEL",
     "arquivo": "app/config.py",
-    "linha": 268
+    "linha": 277
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_FROM (default: no-reply@revy.local)",
     "simbolo": "REVY_TRAFEGO_EMAIL_FROM",
     "arquivo": "app/config.py",
-    "linha": 217
+    "linha": 226
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_FROM_NAME (default: Revy)",
     "simbolo": "REVY_TRAFEGO_EMAIL_FROM_NAME",
     "arquivo": "app/config.py",
-    "linha": 221
+    "linha": 230
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_HOST (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_HOST",
     "arquivo": "app/config.py",
-    "linha": 224
+    "linha": 233
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_USERNAME (default: '')",
     "simbolo": "REVY_TRAFEGO_SMTP_USERNAME",
     "arquivo": "app/config.py",
-    "linha": 230
+    "linha": 239
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_LLM_URL (default: https://api.deepseek.com)",
     "simbolo": "REVY_LOJA_COPILOTO_LLM_URL",
     "arquivo": "app/config.py",
-    "linha": 264
+    "linha": 273
    },
    {
     "secao": "flag",
     "chave": "REVY_LOJA_COPILOTO_FIPE_URL (default: https://parallelum.com.br/fipe/api/v1)",
     "simbolo": "REVY_LOJA_COPILOTO_FIPE_URL",
     "arquivo": "app/config.py",
-    "linha": 290
+    "linha": 299
    },
    {
     "secao": "flag",
     "chave": "PORTAL_META_SPEND_SYNC_ENABLED (default: 1)",
     "simbolo": "PORTAL_META_SPEND_SYNC_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 167
+    "linha": 176
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_URL",
     "simbolo": "REVY_TRAFEGO_URL",
     "arquivo": "app/config.py",
-    "linha": 182
+    "linha": 191
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_EMAIL_BACKEND (default: console)",
     "simbolo": "REVY_TRAFEGO_EMAIL_BACKEND",
     "arquivo": "app/config.py",
-    "linha": 213
+    "linha": 222
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_PUBLIC_BASE_URL (default: '')",
     "simbolo": "REVY_TRAFEGO_PUBLIC_BASE_URL",
     "arquivo": "app/config.py",
-    "linha": 240
+    "linha": 249
    },
    {
     "secao": "flag",
     "chave": "REVY_TRAFEGO_SMTP_USE_TLS (default: 1)",
     "simbolo": "REVY_TRAFEGO_SMTP_USE_TLS",
     "arquivo": "app/config.py",
-    "linha": 236
+    "linha": 245
    },
    {
     "secao": "worker",
@@ -1129,63 +1143,70 @@
     "chave": "GET /app/loja/atendimento/{workspace_id}/mensagens.json",
     "simbolo": "/app/loja/atendimento/{workspace_id}/mensagens.json",
     "arquivo": "app/loja/routes.py",
-    "linha": 752
+    "linha": 811
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/atendimento/{workspace_id}/mensagem",
     "simbolo": "/app/loja/atendimento/{workspace_id}/mensagem",
     "arquivo": "app/loja/routes.py",
-    "linha": 861
+    "linha": 920
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /app/loja/atendimento/{workspace_id}/audio",
+    "simbolo": "/app/loja/atendimento/{workspace_id}/audio",
+    "arquivo": "app/loja/routes.py",
+    "linha": 1041
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/atendimento/{workspace_id}/handoff",
     "simbolo": "/app/loja/atendimento/{workspace_id}/handoff",
     "arquivo": "app/loja/routes.py",
-    "linha": 982
+    "linha": 1158
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/atendimento/{workspace_id}/etapa",
     "simbolo": "/app/loja/atendimento/{workspace_id}/etapa",
     "arquivo": "app/loja/routes.py",
-    "linha": 1061
+    "linha": 1237
    },
    {
     "secao": "rota",
     "chave": "GET /app/loja/agente/configuracao",
     "simbolo": "/app/loja/agente/configuracao",
     "arquivo": "app/loja/routes.py",
-    "linha": 1207
+    "linha": 1383
    },
    {
     "secao": "rota",
     "chave": "PUT /app/loja/agente/configuracao.json",
     "simbolo": "/app/loja/agente/configuracao.json",
     "arquivo": "app/loja/routes.py",
-    "linha": 1237
+    "linha": 1413
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/agente/configuracao/testar.json",
     "simbolo": "/app/loja/agente/configuracao/testar.json",
     "arquivo": "app/loja/routes.py",
-    "linha": 1278
+    "linha": 1454
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/agente/configuracao/publicar",
     "simbolo": "/app/loja/agente/configuracao/publicar",
     "arquivo": "app/loja/routes.py",
-    "linha": 1321
+    "linha": 1497
    },
    {
     "secao": "rota",
     "chave": "POST /app/loja/agente/configuracao/restaurar",
     "simbolo": "/app/loja/agente/configuracao/restaurar",
     "arquivo": "app/loja/routes.py",
-    "linha": 1343
+    "linha": 1519
    },
    {
     "secao": "rota",
@@ -2767,7 +2788,7 @@
     "chave": "app/templates/loja/agente_configuracao.html",
     "simbolo": "loja/agente_configuracao.html",
     "arquivo": "app/loja/routes.py",
-    "linha": 1225
+    "linha": 1401
    },
    {
     "secao": "template",
@@ -2781,7 +2802,7 @@
     "chave": "app/templates/loja/atendimento_workspace.html",
     "simbolo": "loja/atendimento_workspace.html",
     "arquivo": "app/loja/routes.py",
-    "linha": 551
+    "linha": 555
    },
    {
     "secao": "template",

@@ -546,6 +546,10 @@ def atendimento_workspace(
     pode_papel = usuario.papel in _PAPEIS_MUTACAO_ATENDIMENTO
     pode_enviar = pode_papel and not workspace.envio_bloqueado_canal
     pode_atualizar_etapa = pode_papel and bool(lead and lead.get("id"))
+    # Áudio só em Loja Modo 2 e com a janela de atendimento aberta — checado
+    # antes de habilitar o microfone, não depois de gravar.
+    audio_motivo = _motivo_audio_indisponivel(workspace, mensagens) if pode_enviar else None
+    pode_audio = pode_enviar and audio_motivo is None
 
     return templates.TemplateResponse(
         "loja/atendimento_workspace.html",
@@ -558,6 +562,9 @@ def atendimento_workspace(
             AttendanceState=AttendanceState,
             atendimento_enabled=True,
             pode_enviar=pode_enviar,
+            pode_audio=pode_audio,
+            audio_motivo=audio_motivo,
+            audio_max_duracao=settings.audio_max_duration_seconds,
             pode_handoff=pode_papel,
             pode_atualizar_etapa=pode_atualizar_etapa,
             canal_id_filtro=canal_id or workspace.canal_id,
@@ -606,6 +613,58 @@ def _append_query(destino: str, **params: str) -> str:
         return destino
     sep = "&" if "?" in destino else "?"
     return f"{destino}{sep}{'&'.join(partes)}"
+
+
+_AUDIO_JANELA_HORAS = 24
+
+
+def _parse_iso(valor: object) -> datetime | None:
+    if not valor:
+        return None
+    texto = str(valor).strip().replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(texto)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _parse_float(valor: object) -> float | None:
+    if valor in (None, ""):
+        return None
+    try:
+        return float(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+def _janela_atendimento_aberta(mensagens) -> bool:
+    """Cloud só deixa mensagem livre dentro de 24h da última entrada do cliente."""
+    ultima = None
+    for m in mensagens or []:
+        if m.get("direcao") != "entrada":
+            continue
+        ts = _parse_iso(m.get("criada_em"))
+        if ts is not None and (ultima is None or ts > ultima):
+            ultima = ts
+    if ultima is None:
+        return False
+    return datetime.now(timezone.utc) - ultima <= timedelta(hours=_AUDIO_JANELA_HORAS)
+
+
+def _motivo_audio_indisponivel(workspace, mensagens) -> str | None:
+    """Motivo pelo qual o microfone não aparece; None quando pode gravar."""
+    estado = str(getattr(workspace, "canal_estado", "") or "")
+    if not estado.startswith("cloud"):
+        return "Áudio disponível só na central Cloud API (Modo 2)."
+    if not _janela_atendimento_aberta(mensagens):
+        return (
+            "Janela de 24h fechada: até o cliente responder, "
+            "só vai template de texto."
+        )
+    return None
 
 
 def _quer_json(request: Request) -> bool:
@@ -977,6 +1036,123 @@ async def atendimento_enviar_mensagem(
     sufixo = "duplicada" if resultado.duplicada else "enviada"
     sep = "&" if "?" in destino else "?"
     return RedirectResponse(f"{destino}{sep}ok={sufixo}", status_code=303)
+
+
+@router.post("/app/loja/atendimento/{workspace_id}/audio")
+async def atendimento_enviar_audio(
+    request: Request,
+    workspace_id: str,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+    messaging: HumanMessagingPort = Depends(get_human_messaging_port),
+):
+    """Áudio do Vendedor: multipart ao Chatbot. Só Modo 2 (o mic já é oculto fora)."""
+    ctx, erro = await _preparar_envio_atendimento(request, db, workspace_id)
+    if erro is not None:
+        return erro
+    usuario = ctx.usuario
+    telefone = ctx.telefone
+    form = ctx.form
+    canal_id_form = ctx.canal_id_form
+    destino = ctx.destino
+    quer_json = ctx.quer_json
+
+    def _erro(status: int, code: str, message: str):
+        if quer_json:
+            return _json_erro(status, code, message)
+        return RedirectResponse(_append_query(destino, erro=code), status_code=303)
+
+    arquivo = form.get("arquivo")
+    if arquivo is None or not hasattr(arquivo, "read"):
+        return _erro(400, "audio", "Áudio ausente")
+    conteudo = await arquivo.read(settings.audio_max_bytes + 1)
+    if not conteudo:
+        return _erro(400, "audio", "Áudio vazio")
+    if len(conteudo) > settings.audio_max_bytes:
+        return _erro(413, "audio_grande", "Áudio acima do limite permitido")
+    duracao = _parse_float(form.get("duracao_segundos"))
+    if duracao is not None and duracao > settings.audio_max_duration_seconds:
+        return _erro(422, "audio_longo", "Áudio acima do tempo permitido")
+
+    conversa_resumo, _, _ = _conversa_por_telefone(
+        chatbot, telefone, canal_id=canal_id_form
+    )
+    if conversa_resumo and not canal_permite_envio(
+        canal_ativo=conversa_resumo.get("canal_ativo"),
+        canal_estado=conversa_resumo.get("canal_estado"),
+    ):
+        return _erro(423, "canal", "Canal inativo ou desconectado")
+
+    instance_conversa = None
+    if conversa_resumo:
+        instance_conversa = (
+            conversa_resumo.get("evolution_instance")
+            or conversa_resumo.get("instance")
+        )
+
+    idem = (form.get("idempotency_key") or "").strip()
+    if not idem or len(idem) > 120:
+        idem = f"portal:{usuario.loja_slug}:{telefone}:{uuid4().hex}"
+
+    mime = getattr(arquivo, "content_type", None) or "audio/webm"
+    filename = getattr(arquivo, "filename", None) or "voz.webm"
+
+    try:
+        resultado = messaging.enviar_audio(
+            telefone,
+            conteudo,
+            idempotency_key=idem,
+            filename=filename,
+            mime=mime,
+            duracao_segundos=duracao,
+            instance=instance_conversa,
+            ator=usuario.email,
+        )
+    except MensagemHumanaNaoEncontrada:
+        return _erro(404, "conversa", "Conversa não encontrada")
+    except MensagemHumanaNaoAutorizada:
+        return _erro(403, "perm", "Envio não autorizado")
+    except MensagemHumanaErro as exc:
+        return _erro(422, "audio", str(exc) or "Áudio recusado")
+    except ChatbotIndisponivel:
+        return _erro(503, "envio", "Não foi possível enviar o áudio agora")
+
+    criada_em = datetime.now(timezone.utc).isoformat()
+    msg_id = resultado.mensagem_id
+    if hasattr(chatbot, "mensagens") and isinstance(getattr(chatbot, "mensagens"), dict):
+        hist = chatbot.mensagens.setdefault(telefone, [])
+        if not resultado.duplicada:
+            hist.append(
+                {
+                    "id": msg_id,
+                    "direcao": "saida",
+                    "texto": "",
+                    "tipo": "audio",
+                    "criada_em": criada_em,
+                    "humana": True,
+                }
+            )
+        if hasattr(chatbot, "estados"):
+            chatbot.estados[telefone] = {"bot_ativo": False, "status": "handoff"}
+
+    if quer_json:
+        return JSONResponse(
+            {
+                "ok": True,
+                "duplicada": bool(resultado.duplicada),
+                "bot_ativo": bool(resultado.bot_ativo),
+                "mensagem": {
+                    "id": msg_id,
+                    "direcao": "saida",
+                    "texto": "",
+                    "tipo": "audio",
+                    "criada_em": criada_em,
+                },
+            }
+        )
+
+    sufixo = "duplicada" if resultado.duplicada else "enviada"
+    return RedirectResponse(_append_query(destino, ok=sufixo), status_code=303)
 
 
 @router.post("/app/loja/atendimento/{workspace_id}/handoff")
