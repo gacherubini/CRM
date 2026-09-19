@@ -252,3 +252,30 @@ def test_retomada_nao_repete_provedor_ja_persistido(db):
     assert sim.status == "concluida"
     assert chamadas == {"A": 0, "B": 1}
     assert len(sim.resultados) == 2
+
+
+def test_sexo_chega_ao_driver_apos_o_payload_cifrado(db):
+    """O Bradesco exige o Sexo no modal 'Precisamos de mais informacoes'. O
+    payload do Portal traz `pessoa.sexo`, mas o Motor persistia o blob pessoal
+    sem o campo e o worker reconstruia a Pessoa sem ele: o driver abortava com
+    `sexo_nao_informado` mesmo com o dado preenchido (sim real)."""
+    visto: dict[str, str | None] = {}
+
+    def _captura(nome):
+        def _driver(sol):
+            visto["sexo"] = sol.pessoa.sexo
+            return _ok(nome)(sol)
+
+        return _driver
+
+    sol = SolicitacaoSimulacao(
+        pessoa=Pessoa(
+            cpf="529.982.247-25", nascimento="1990-05-20", sexo="Feminino"
+        ),
+        veiculo=Veiculo(categoria="moto", valor=20000),
+        condicoes=Condicoes(entrada=5000, prazo_meses=48),
+    )
+    sim, _ = servico.criar_simulacao(db, sol, TEST_CLIENT_ID)
+    _reservar(db)
+    processar_job(db, sim.id, drivers=[("Bradesco", _captura("Bradesco"))])
+    assert visto["sexo"] == "Feminino"

@@ -371,3 +371,99 @@ def test_passo_consulta_cpf_reconhece_nao_elegivel(monkeypatch):
     with pytest.raises(RejeicaoNegocio) as ei:
         driver._passo_consulta_cpf(page, _sol(), None)
     assert ei.value.codigo == "credito_recusado"
+
+
+# --- prints de diagnostico -------------------------------------------------
+
+
+def _ctx_eventos():
+    eventos = []
+
+    class Ctx:
+        screenshot_dir = None
+        simulacao_id = "sim-teste"
+
+        def registrar_evento(self, etapa, mensagem, nivel="info", **kw):
+            eventos.append({"etapa": etapa, "nivel": nivel, **kw})
+
+    return Ctx(), eventos
+
+
+def test_nao_elegivel_registra_print_da_tela(monkeypatch):
+    """A tela que gera a recusa tem de virar print no Portal. Antes dela, a
+    ultima imagem era o formulario preenchido, sem a mensagem "nao elegivel"."""
+    import app.motor.playwright_base as pb
+
+    driver = MotrixDriver(timeout_ms=20_000)
+    monkeypatch.setattr(driver, "_preencher", lambda *a, **k: None)
+    monkeypatch.setattr(driver, "_aguardar_habilitado", lambda *a, **k: None)
+    monkeypatch.setattr(config, "EVENT_SCREENSHOTS", True)
+    monkeypatch.setattr(
+        pb, "capturar_print_evento", lambda *a, **k: ("print.jpg", b"jpeg")
+    )
+
+    page = MagicMock()
+    page.wait_for_function.return_value = None
+    page.inner_text.return_value = "Dados do Cliente\nCliente não elegível"
+    ctx, eventos = _ctx_eventos()
+
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._passo_consulta_cpf(page, _sol(), ctx)
+
+    assert ei.value.codigo == "credito_recusado"
+    assert eventos[-1]["etapa"] == "cliente_nao_elegivel"
+    assert eventos[-1]["screenshot_conteudo"] == b"jpeg"
+
+
+def test_ofertas_sem_resposta_registra_print(monkeypatch):
+    """Timeout na espera das ofertas nao pode sair sem a tela final registrada."""
+    import app.motor.playwright_base as pb
+
+    driver = MotrixDriver(timeout_ms=20_000)
+    monkeypatch.setattr(config, "EVENT_SCREENSHOTS", True)
+    monkeypatch.setattr(
+        pb, "capturar_print_evento", lambda *a, **k: ("print.jpg", b"jpeg")
+    )
+
+    page = MagicMock()
+    page.wait_for_function.side_effect = TimeoutError("sem resposta")
+    ctx, eventos = _ctx_eventos()
+
+    with pytest.raises(ErroTransitorio) as ei:
+        driver._passo_ler_ofertas(page, ctx)
+
+    assert ei.value.codigo == "ofertas_sem_resposta"
+    assert eventos[-1]["etapa"] == "ofertas_sem_resposta"
+    assert eventos[-1]["screenshot_conteudo"] == b"jpeg"
+
+
+def test_ofertas_lidas_le_a_resposta_antes_de_estabilizar(monkeypatch):
+    """A recusa e um aviso efemero: o texto e o print tem de sair no instante
+    em que a resposta aparece, nao 3s depois (quando o wizard ja voltou ao
+    formulario e o Portal mostra o passo 2 em vez da recusa)."""
+    import app.motor.playwright_base as pb
+
+    ordem = []
+    driver = MotrixDriver(timeout_ms=20_000)
+    monkeypatch.setattr(config, "EVENT_SCREENSHOTS", True)
+    monkeypatch.setattr(
+        pb,
+        "capturar_print_evento",
+        lambda *a, **k: ordem.append("print") or ("print.jpg", b"jpeg"),
+    )
+    page = MagicMock()
+    page.wait_for_function.return_value = None
+    page.inner_text.return_value = (
+        "Não há oferta de crédito disponível para este cliente"
+    )
+    page.wait_for_timeout.side_effect = lambda *a, **k: ordem.append("espera")
+    ctx, _ = _ctx_eventos()
+
+    texto = driver._passo_ler_ofertas(page, ctx)
+
+    assert "Não há oferta" in texto
+    assert ordem[0] == "print", "print saiu depois da espera de estabilizacao"
+    assert page.locator.return_value.first.scroll_into_view_if_needed.called, (
+        "a resposta pode nascer abaixo da dobra; sem rolar ate ela o print sai "
+        "do formulario"
+    )

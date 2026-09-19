@@ -114,6 +114,9 @@ def criar_simulacao(
             "ddd": sol.pessoa.ddd,
             "celular": sol.pessoa.celular,
             "codigo_natureza_ocupacao": sol.pessoa.codigo_natureza_ocupacao,
+            # O Bradesco exige o Sexo no modal; sem persistir aqui o worker
+            # reconstroi a Pessoa sem o campo e o driver aborta sempre.
+            "sexo": sol.pessoa.sexo,
         }
     )
     # Enfileira: status 'recebida'. O worker executa os provedores depois.
