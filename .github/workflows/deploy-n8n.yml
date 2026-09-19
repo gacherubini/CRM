@@ -72,14 +72,49 @@ jobs:
           for t in n8n/test_*.js; do node "$t"; done
 
       # O .ready.json e gerado, nunca commitado (AGENTS.md secao 5).
+      #
+      # Escreve TODO secret com prefixo CHATBOT_ ou EVOLUTION_ em vez de uma
+      # lista fixa. A lista fixa ja quebrou o deploy em 19/09/2026: o
+      # prepare-workflow.ps1 le o token do chatbot por VARIAVEL
+      # (`$secrets[$chatbotTokenKey]`), que vale CHATBOT_API_TOKEN em
+      # production/test e CHATBOT_API_TOKEN_CLOUD em cloud/preview. Nenhum dos
+      # dois aparece como literal no script, entao nenhum dos dois entrou na
+      # lista, e o deploy morreu em 13s.
       - name: montar .secrets.local
-        run: |
-          umask 077
-          printf 'CHATBOT_WEBHOOK_TOKEN=%s\n' "$CHATBOT_WEBHOOK_TOKEN" >  deploy/fly/3vm/.secrets.local
-          printf 'EVOLUTION_API_KEY=%s\n'     "$EVOLUTION_API_KEY"     >> deploy/fly/3vm/.secrets.local
         env:
-          CHATBOT_WEBHOOK_TOKEN: ${{ secrets.CHATBOT_WEBHOOK_TOKEN }}
-          EVOLUTION_API_KEY: ${{ secrets.EVOLUTION_API_KEY }}
+          SEGREDOS: ${{ toJSON(secrets) }}
+        run: |
+          set -euo pipefail
+          umask 077
+          python - <<'PY'
+          import json, os, re
+
+          alvo = re.compile(r"^(CHATBOT|EVOLUTION)_")
+          itens = {
+              k: v
+              for k, v in json.loads(os.environ["SEGREDOS"]).items()
+              if alvo.match(k) and v
+          }
+
+          modo = os.environ.get("MODO", "production")
+          token_do_modo = (
+              "CHATBOT_API_TOKEN_CLOUD" if modo in ("cloud", "preview") else "CHATBOT_API_TOKEN"
+          )
+          preciso = {"CHATBOT_WEBHOOK_TOKEN", "EVOLUTION_API_KEY", token_do_modo}
+
+          faltando = sorted(preciso - set(itens))
+          if faltando:
+              for nome in faltando:
+                  print(f"::error::falta o secret {nome} (modo={modo}). Grave com: gh secret set {nome}")
+              raise SystemExit(1)
+
+          with open("deploy/fly/3vm/.secrets.local", "w", encoding="utf-8") as f:
+              for chave, valor in sorted(itens.items()):
+                  f.write(f"{chave}={valor}\n")
+
+          # Nomes, nunca valores.
+          print("chaves escritas:", ", ".join(sorted(itens)))
+          PY
 
       - name: gerar o .ready.json
         shell: pwsh
