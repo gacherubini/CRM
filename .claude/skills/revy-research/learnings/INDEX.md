@@ -80,3 +80,4 @@ escrever migration com `batch_alter_table`.
 | bot responde vazio ou /v1/operacao/responder devolve 422 texto com modelo de raciocinio | `2026-09-16-modelo-que-pensa-nao-cabe-no-teto-250.md` |
 | rodar script python via fly ssh console | `2026-09-19-fly-ssh-script-em-tmp-precisa-pythonpath.md` |
 | harness bash que roda nos dois SOs | `2026-09-19-harness-escolhe-python-por-execucao.md` |
+| oráculo e2e que consulta estado que humano muda | `2026-09-19-oraculo-aceita-estado-pos-toque.md` |
