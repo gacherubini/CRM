@@ -71,3 +71,18 @@ correto. Nas mesmas sims o Bradesco saiu `saida_de_rede_divergente` (IP do proxy
 diferente do esperado) — a suspeita e o caminho de rede do worker, nao o
 portal: **olhe o proxy/IP de saida antes de mexer no driver**. O print do evento
 (na branch `triagem-simulacoes`) confirma a tela na proxima ocorrencia pos-deploy.
+
+**19/09 — o print de 18/09 respondeu: era tela nova, nao rede.** O blob de
+`consulta_cpf_sem_resposta` (sim `afa4e02d`) mostra o passo "Consulta CPF" com o
+CPF preenchido e, em vermelho, **"Cliente não elegível"** — o portal RESPONDEU. A
+espera do driver (`motrix.py:461`) so conhecia o positivo "Cliente elegível" e
+"CPF inválido"; "Cliente não elegível" nao casava, entao o passo esperava os 120s
+e saia como erro tecnico. E recusa de negocio:
+
+- `NAO_ELEGIVEL` passou a casar na espera e no parser, e sai `credito_recusado`;
+- `motrix_sem_oferta` tambem virou `credito_recusado` — e o unico codigo que o
+  Portal pinta como "Credito recusado" (`_veredito_do_codigo`), entao recusa de
+  credito parava de aparecer como "Falhou".
+
+Licao reforcada: para banco com recusa, **comece pelo print do evento** — ele
+responde em um olhar o que o `codigo_erro` esconde.

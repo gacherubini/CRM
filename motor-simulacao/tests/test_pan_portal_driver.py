@@ -438,6 +438,112 @@ def test_modal_que_nao_fecha_levanta_codigo_proprio(monkeypatch):
     assert ei.value.codigo == "pan_modal_agente_nao_fechou"
 
 
+def test_fechar_modal_acha_o_x_pelo_class_do_mahoe(monkeypatch):
+    """O X do dialog do go!PAN e um `<mahoe-nav-button>` com class
+    `mahoe-modal__button-modal--close` (traco DUPLO; diag de 19/09). Os
+    seletores antigos (`button.close`, `aria-label*='echar'/'lose'`) nao casam
+    com esse token e o modal ficava aberto -> `pan_modal_agente_nao_fechou` em
+    producao (10x, 17-18/09). So o X real presente deve bastar para fechar."""
+    driver = PanPortalDriver(timeout_ms=20_000)
+    page = MagicMock()
+    estado = {"aberto": True}
+    monkeypatch.setattr(driver, "_modal_agente_aberto", lambda p: estado["aberto"])
+
+    class _X:
+        def count(self):
+            return 1
+
+        def click(self, **_kw):
+            estado["aberto"] = False
+
+    x = _X()
+
+    def locator(sel):
+        m = MagicMock()
+        if "mahoe-modal__button-modal--close" in sel:
+            m.first = x
+        else:
+            m.first.count.return_value = 0
+        return m
+
+    page.locator.side_effect = locator
+    page.get_by_role.return_value.first.count.return_value = 0
+
+    driver._fechar_modal_agente(page)
+
+    assert estado["aberto"] is False
+
+
+def test_clicar_salvar_para_assim_que_o_modal_fecha(monkeypatch):
+    """Caminho feliz: clica e o modal fecha na primeira checagem pos-clique."""
+    driver = PanPortalDriver(timeout_ms=20_000)
+    page = MagicMock()
+    monkeypatch.setattr(driver, "_modal_agente_aberto", lambda p: False)
+
+    driver._clicar_salvar(page)
+
+    page.locator.assert_called_once()
+
+
+def test_clicar_salvar_repete_e_desiste_com_codigo_proprio(monkeypatch):
+    """O modal nao fecha de jeito nenhum: tem de desistir com erro legivel em vez
+    de queimar 10s num único clique (probe de 19/09: re-render do Angular deixou
+    o `get_by_role(name='Salvar')` em count 0 e o clique estourou timeout)."""
+    driver = PanPortalDriver(timeout_ms=20_000)
+    page = MagicMock()
+    monkeypatch.setattr(driver, "_modal_agente_aberto", lambda p: True)
+
+    with pytest.raises(ErroTransitorio) as ei:
+        driver._clicar_salvar(page)
+
+    assert ei.value.codigo == "pan_agente_nao_salvou"
+    # Tentou clicar mais de uma vez antes de desistir.
+    assert page.locator.return_value.first.click.call_count >= 2
+
+
+def _aberturas_do_cabecalho(page):
+    return [
+        c
+        for c in page.get_by_role.call_args_list
+        if hasattr(c.kwargs.get("name"), "pattern")
+        and "Agente e operador" in c.kwargs["name"].pattern
+    ]
+
+
+def test_agente_ja_definido_nao_reabre_o_modal_no_passo_seguinte(monkeypatch):
+    """19/09: com o modal reaberto a cada passo, a 2a abertura ja configurada
+    travava o Salvar e derrubava o PAN (`pan_agente_nao_salvou`). Definido uma
+    vez, nao reabre — so age se o modal estiver bloqueando a tela."""
+    monkeypatch.setattr(config, "PAN_AGENTE_CERTIFICADO", "Giovanna")
+    monkeypatch.setattr(config, "PAN_OPERADOR", "Bruna")
+    driver = PanPortalDriver(timeout_ms=20_000)
+    page = MagicMock()
+    # passo: fechado; _abrir: fechado; apos cabecalho: aberto.
+    page.evaluate.side_effect = [False, False, True]
+    monkeypatch.setattr(driver, "_escolher_no_combo", lambda *a, **k: None)
+    monkeypatch.setattr(driver, "_clicar_salvar", lambda p: None)
+
+    driver._configurar_agente_operador(page)
+    assert len(_aberturas_do_cabecalho(page)) == 1, "abre uma vez para definir"
+
+    # Passo seguinte: modal fechado e ja definido -> nao reabre.
+    page.evaluate.side_effect = [False, False, True]
+    driver._configurar_agente_operador(page)
+    assert len(_aberturas_do_cabecalho(page)) == 1, "nao reabre a cada passo"
+
+
+def test_cada_rodada_recomeca_sem_agente_definido():
+    """`REAL_DRIVERS` guarda o driver como singleton: se o flag nao resetar, a
+    2a simulacao do worker pula a escolha de agente e a proposta fica sem dono."""
+    driver = PanPortalDriver(html_simulacao="<html>sem oferta</html>")
+    driver._agente_operador_definido = True
+
+    with pytest.raises(RejeicaoNegocio):
+        driver.simular(_sol())
+
+    assert driver._agente_operador_definido is False
+
+
 def test_campo_ausente_com_modal_aberto_trata_o_modal_e_tenta_de_novo(monkeypatch):
     """16/09: o dialogo reapareceu no meio do preenchimento e o campo (que
     existia atras do overlay) saiu como `campo_nao_encontrado`."""

@@ -415,6 +415,26 @@ def test_recusa_de_credito_nao_vira_veiculo_nao_resolvido():
     assert ei.value.codigo == "credito_recusado"
 
 
+def test_passo_veiculo_sonda_recusa_antes_de_tocar_na_placa(monkeypatch):
+    """Se o modal de política de crédito já estiver na tela quando o passo do
+    veículo começa (o veículo fica em branco), a recusa tem de sair como negócio
+    ANTES de mexer na placa — senão o clique na placa morre no overlay e vira
+    `portal_falhou` técnico, que é o "tratado como erro" que não pode acontecer."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = MagicMock()
+
+    def recusa(_page):
+        raise RejeicaoNegocio("credito_recusado", "CPF fora da política")
+
+    monkeypatch.setattr(driver, "_levantar_se_recusado", recusa)
+
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._passo_veiculo(page, _sol())
+
+    assert ei.value.codigo == "credito_recusado"
+    page.get_by_label.assert_not_called()  # nao chegou a mexer na placa
+
+
 def test_modal_de_placa_tratado_dispensa_a_linha_com_botao():
     """Depois do modal escolhido nao sobra 'linha com botao'; clicar la era o bug."""
     driver = FontecredDriver(timeout_ms=20_000)

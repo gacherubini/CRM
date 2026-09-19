@@ -54,6 +54,10 @@ PROVEDOR = "motrix"
 
 PRODUTO_CARD = re.compile(r"Simula[çc][ãa]o de Financiamento Veicular", re.I)
 ELEGIVEL = re.compile(r"Cliente eleg[íi]vel", re.I)
+# O espelho do elegivel: quando o bureau/SCR barra, o portal responde
+# "Cliente nao elegivel" no mesmo lugar (print real de 18/09, sim afa4e02d).
+# E recusa de negocio — o cliente nao passou — nao defeito de robo.
+NAO_ELEGIVEL = re.compile(r"Cliente n[ãa]o eleg[íi]vel", re.I)
 # Recusa de negocio, nao erro: o portal responde isso dentro do proprio modal.
 SEM_OFERTA = re.compile(r"N[ãa]o h[áa] oferta de cr[ée]dito", re.I)
 CPF_INVALIDO = re.compile(r"CPF\s+(inv[áa]lido|n[ãa]o\s+encontrado)", re.I)
@@ -217,14 +221,14 @@ class MotrixDriver(PlaywrightBankDriver):
     def _resultados_de_texto(
         self, texto: str, sol: SolicitacaoSimulacao
     ) -> list[ResultadoDriver]:
-        if SEM_OFERTA.search(texto):
+        if SEM_OFERTA.search(texto) or NAO_ELEGIVEL.search(texto):
             raise RejeicaoNegocio(
-                "motrix_sem_oferta", "Motrix não ofertou crédito para este cliente"
+                "credito_recusado", "Motrix não aprovou crédito para este cliente"
             )
         ofertas = parse_ofertas(texto)
         if not ofertas:
             # Painel sem a frase de recusa e sem parcela legivel nao e decisao de
-            # credito: e o parser nao entendendo a tela. Sair por `motrix_sem_oferta`
+            # credito: e o parser nao entendendo a tela. Sair por `credito_recusado`
             # aqui esconderia parser quebrado atras de "o banco negou", e o parser
             # de ofertas ainda nao viu texto real de oferta nenhum.
             raise IntervencaoNecessaria(
@@ -458,7 +462,8 @@ class MotrixDriver(PlaywrightBankDriver):
         prazo = int(getattr(config, "OFERTAS_TIMEOUT_MS", 240_000))
         try:
             page.wait_for_function(
-                "() => /Cliente eleg[íi]vel|N[ãa]o h[áa] oferta|CPF inv[áa]lido/i"
+                "() => /Cliente n[ãa]o eleg[íi]vel|Cliente eleg[íi]vel"
+                "|N[ãa]o h[áa] oferta|CPF inv[áa]lido/i"
                 ".test(document.body.innerText)",
                 timeout=min(prazo, 120_000),
             )
@@ -481,9 +486,9 @@ class MotrixDriver(PlaywrightBankDriver):
         corpo = page.inner_text("body")
         if CPF_INVALIDO.search(corpo):
             raise RejeicaoNegocio("cpf_invalido", "Motrix não aceitou o CPF")
-        if SEM_OFERTA.search(corpo):
+        if SEM_OFERTA.search(corpo) or NAO_ELEGIVEL.search(corpo):
             raise RejeicaoNegocio(
-                "motrix_sem_oferta", "Motrix não ofertou crédito para este cliente"
+                "credito_recusado", "Motrix não aprovou crédito para este cliente"
             )
         if not ELEGIVEL.search(corpo):
             raise ErroTransitorio(
