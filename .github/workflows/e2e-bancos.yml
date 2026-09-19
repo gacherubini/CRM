@@ -1,0 +1,124 @@
+# E2E ao vivo dos portais de banco. Fica FORA do caminho de merge, de proposito.
+#
+# Por que nao entra no PR gate:
+#   - cada rodada gasta um login de verdade no portal de cada banco;
+#   - o Bradesco passa de 4 min so na etapa de analise;
+#   - runner do GitHub e IP de datacenter, que e justamente a suspeita de
+#     bloqueio que ja trava o Bradesco hoje.
+#
+# Por isso roda em runner self-hosted (sua maquina, seu IP residencial) e so
+# quando voce manda: nao tem `schedule`, nao tem `pull_request`.
+#
+#   gh workflow run e2e-bancos.yml -f bancos=bradesco,pan
+#
+# NAO existe upload de screenshot como artifact: o repo e publico, artifact de
+# repo publico e baixavel por qualquer um, e a tela de falha do portal esta com
+# o CPF preenchido. As imagens ficam na sua maquina.
+name: E2E bancos
+
+on:
+  workflow_dispatch:
+    inputs:
+      bancos:
+        description: "Quais bancos (vazio = todos). Ex: bradesco,pan"
+        type: string
+        default: ""
+      headless:
+        description: "Rodar sem janela (necessario se o runner roda como servico)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: e2e-bancos
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: probe_todos
+    runs-on: [self-hosted]
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: motor-simulacao
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install chromium
+
+      # Monta o .env.local a partir do que esta no GitHub. Nada de lista fixa:
+      # todo secret ou variable com prefixo MOTOR_ / PROBE_ / MOTRIX_ entra
+      # sozinho. Adicionar um banco novo = `gh secret set`, sem tocar no YAML.
+      #
+      # Segredo vai em `secrets` (senha, CPF, celular: escrita so). Parametro de
+      # simulacao vai em `vars` (placa, valor, prazo: da pra ler e editar na UI).
+      - name: montar .env.local a partir do GitHub
+        env:
+          SEGREDOS: ${{ toJSON(secrets) }}
+          VARIAVEIS: ${{ toJSON(vars) }}
+          FORCAR_HEADLESS: ${{ inputs.headless }}
+        # Python em vez de jq de proposito: este job roda em runner self-hosted
+        # (Windows), onde jq nao vem instalado. Python vem, o passo acima instala.
+        run: |
+          set -euo pipefail
+          umask 077
+          python - <<'PY'
+          import json, os, re
+
+          alvo = re.compile(r"^(MOTOR|PROBE|MOTRIX)_")
+          linhas = []
+          for bruto in (os.environ["VARIAVEIS"], os.environ["SEGREDOS"]):
+              for chave, valor in json.loads(bruto or "{}").items():
+                  if alvo.match(chave) and valor not in (None, ""):
+                      linhas.append(f"{chave}={valor}")
+
+          if os.environ.get("FORCAR_HEADLESS") == "true":
+              linhas = [l for l in linhas if not l.startswith("MOTOR_BROWSER_HEADLESS=")]
+              linhas.append("MOTOR_BROWSER_HEADLESS=1")
+
+          with open(".env.local", "w", encoding="utf-8") as f:
+              f.write("\n".join(linhas) + "\n")
+
+          # Confere sem imprimir valor nenhum.
+          print(f"variaveis carregadas: {len(linhas)}")
+          for l in sorted(linhas):
+              print(" ", l.split("=", 1)[0])
+          PY
+
+      - name: rodar os probes
+        run: |
+          set -uo pipefail
+          ARGS=""
+          if [ -n "${{ inputs.bancos }}" ]; then ARGS="--bancos ${{ inputs.bancos }}"; fi
+          python scripts/probe_todos.py $ARGS | tee /tmp/relatorio.txt
+          exit "${PIPESTATUS[0]}"
+
+      - name: apagar credenciais do runner
+        if: always()
+        run: rm -f .env.local
+
+      # So o relatorio em texto, que o proprio probe promete nao conter senha,
+      # CPF nem usuario. Screenshot nao sai da maquina.
+      - name: resumo
+        if: always()
+        run: |
+          {
+            echo "### E2E bancos"
+            echo ""
+            echo '```'
+            tail -40 /tmp/relatorio.txt 2>/dev/null || echo "sem relatorio"
+            echo '```'
+            echo ""
+            echo "Screenshots de falha ficaram na maquina, em \`motor-simulacao/\`."
+          } >> "$GITHUB_STEP_SUMMARY"

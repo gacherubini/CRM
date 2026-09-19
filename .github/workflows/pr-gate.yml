@@ -1,0 +1,292 @@
+# Portao de merge. Nenhum PR entra na main sem este workflow verde.
+#
+# Repo publico tem Actions gratis, entao nao ha economia a fazer filtrando por
+# pasta: roda tudo, sempre. O filtro por caminho existe do outro lado, nos
+# deploys, onde evita subir o site porque o chatbot mudou.
+name: PR gate
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Push novo no PR cancela a rodada anterior.
+concurrency:
+  group: pr-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  testes:
+    name: testes / ${{ matrix.produto }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        produto:
+          - chatbot-api
+          - motor-simulacao
+          - estoque-api
+          - portal-gestao
+          - revy-trafego
+          - catalogo-publico
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ${{ matrix.produto }}/requirements.txt
+
+      - name: instalar dependencias do produto
+        working-directory: ${{ matrix.produto }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # A partir da pasta do produto, senao importa o `app` errado
+      # (AGENTS.md secao 5). Cada suite sobe o proprio SQLite in-memory.
+      - name: pytest
+        working-directory: ${{ matrix.produto }}
+        run: python -m pytest -q
+
+  migrations:
+    name: migrations PG / ${{ matrix.produto }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - produto: chatbot-api
+            var: DATABASE_URL
+            db: ci_chatbot
+            vtable: alembic_version
+          - produto: motor-simulacao
+            var: DATABASE_URL
+            db: ci_motor
+            vtable: alembic_version
+          - produto: estoque-api
+            var: DATABASE_URL
+            db: ci_estoque
+            vtable: alembic_version
+          - produto: portal-gestao
+            var: PORTAL_DATABASE_URL
+            db: ci_portal
+            vtable: alembic_version
+          # O Control renomeia a tabela de versao em alembic/env.py. Pre-criar
+          # `alembic_version` aqui nao protegeria nada.
+          - produto: revy-trafego
+            var: REVY_TRAFEGO_DATABASE_URL
+            db: ci_trafego
+            vtable: alembic_version_revy_trafego
+    env:
+      # O env.py de cada produto importa app.config; estes evitam que o import
+      # morra por falta de variavel. Nenhum valor real, nenhum segredo.
+      PORTAL_SESSION_SECRET: segredo-de-ci
+      ESTOQUE_API_TOKEN: token-de-ci
+      CHATBOT_API_TOKEN: token-de-ci
+      MOTOR_ENCRYPTION_KEY: chave-de-ci-nao-usada-em-producao
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ${{ matrix.produto }}/requirements.txt
+
+      - name: instalar dependencias do produto
+        working-directory: ${{ matrix.produto }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: criar banco limpo para o produto
+        run: PGPASSWORD=ci psql -h localhost -U ci -d ci -c "CREATE DATABASE ${{ matrix.db }};"
+
+      # O alembic cria a tabela de versao com version_num VARCHAR(32), largura
+      # hardcoded e sem opcao de configuracao. Nove revisions do repo passam
+      # disso; o SQLite nao impoe largura de VARCHAR e o Postgres impoe.
+      #
+      # A decisao do repo (ensaio de 16/08/2026) e pre-criar a tabela mais larga
+      # antes do primeiro upgrade — o alembic so cria se nao existir. O DDL e o
+      # de deploy/migracao-pg/README.md, e este passo existe para o CI seguir o
+      # mesmo procedimento do banco de verdade em vez de um caminho proprio.
+      # Guarda-corpo do outro lado: tests/test_alembic_version_largura.py.
+      - name: pre-criar a tabela de versao larga (procedimento de migracao-pg)
+        run: |
+          PGPASSWORD=ci psql -h localhost -U ci -d "${{ matrix.db }}" -v ON_ERROR_STOP=1 -c "
+            CREATE TABLE ${{ matrix.vtable }} (
+                version_num VARCHAR(255) NOT NULL,
+                CONSTRAINT ${{ matrix.vtable }}_pkc PRIMARY KEY (version_num)
+            );"
+
+      # Duas cabecas de alembic e o classico do monorepo: dois PRs abrem
+      # migration em paralelo e a conta so chega no boot da producao, que e
+      # fail-fast. Aqui chega no PR.
+      - name: uma cabeca so
+        working-directory: ${{ matrix.produto }}
+        run: |
+          set -euo pipefail
+          export "${VAR}=postgresql+psycopg://ci:ci@localhost:5432/${DB}"
+          alembic heads | tee /tmp/heads.txt
+          # `|| true`: grep -c sai 1 quando nao acha nada, e ai quem falha e o
+          # grep, nao a checagem — o erro sairia ilegivel.
+          N=$(grep -c '(head)' /tmp/heads.txt || true)
+          if [ "$N" != "1" ]; then
+            echo "::error::esperava 1 cabeca de migration, achei $N. Dois PRs criaram migration em paralelo?"
+            exit 1
+          fi
+        env:
+          VAR: ${{ matrix.var }}
+          DB: ${{ matrix.db }}
+
+      # Todo conftest do repo roda em SQLite. O que quebra so em Postgres
+      # (batch_alter_table, tipos, constraint nomeada) aparece aqui e em
+      # nenhum outro lugar antes da producao.
+      - name: alembic upgrade head em Postgres
+        working-directory: ${{ matrix.produto }}
+        run: |
+          set -euo pipefail
+          export "${VAR}=postgresql+psycopg://ci:ci@localhost:5432/${DB}"
+          alembic upgrade head
+          alembic current
+        env:
+          VAR: ${{ matrix.var }}
+          DB: ${{ matrix.db }}
+
+  n8n:
+    name: n8n / validadores + testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: instalar @n8n/tournament
+        working-directory: n8n
+        run: npm install --no-audit --no-fund
+
+      # Os quatro validadores protegem regras diferentes do fluxo. Rodam da raiz.
+      - name: validadores de workflow
+        run: |
+          python n8n/validate_workflow.py
+          python n8n/validate_test_workflow.py
+          python n8n/validate_workflow_cloud.py
+          python n8n/validate_preview_workflow.py
+
+      # Validador so ve forma. Estes passam as expressoes pelo motor real do
+      # n8n, que e onde mora o bot mudo em producao depois de um import que o
+      # proprio n8n aceitou sem reclamar.
+      - name: testes de node
+        run: |
+          set -euo pipefail
+          for t in n8n/test_*.js; do
+            echo "::group::$t"
+            node "$t"
+            echo "::endgroup::"
+          done
+
+  segredos:
+    name: segredos / varredura
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # So em pull_request, e de proposito. Neste evento o gitleaks varre os
+      # commits do PR, que e o que este job existe para fazer: impedir que um
+      # segredo ENTRE pelo PR. Em workflow_dispatch ele varre o historico
+      # inteiro e devolve ruido.
+      #
+      # O historico foi varrido na mao em 19/09/2026: 77 achados, todos falso
+      # positivo. 60 sao UUID de no e texto de descricao nos `n8n/workflow-*.json`
+      # (os segredos de verdade la sao marcadores `__ALGO__`, e o .ready.json com
+      # valor real e gitignored); 8 sao exemplos de `curl -H Authorization` em
+      # README e plano; o resto e identificador longo, incluindo um
+      # `return {"status": "ok"}`. Nenhum `.env` jamais foi rastreado.
+      #
+      # Nao troque isto por um allowlist de caminho: allowlist em
+      # `chatbot-api/app/main.py` engoliria um segredo de verdade amanha.
+      # Para rever o historico de novo:
+      #   gitleaks detect --source . --report-path /tmp/leaks.json
+      #
+      # Para fixar a acao por SHA em vez da tag:
+      #   gh api repos/gitleaks/gitleaks-action/git/ref/tags/v2 --jq .object.sha
+      - name: gitleaks
+        if: github.event_name == 'pull_request'
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Cinto e suspensorio: o gitleaks procura formato de segredo, este passo
+      # procura por nome os arquivos que o AGENTS.md proibe no git.
+      - name: arquivo proibido no diff
+        run: |
+          set -euo pipefail
+          BASE="origin/${{ github.base_ref || 'main' }}"
+          PROIBIDO='(^|/)\.env($|\.)|workflow-fly\.ready\.json|(^|/)\.token'
+          NOVOS=$(git diff --name-only --diff-filter=A "${BASE}...HEAD" \
+            | { grep -E "$PROIBIDO" || true; } \
+            | { grep -v -E '\.example$|\.exemplo$' || true; })
+          if [ -n "$NOVOS" ]; then
+            echo "::error::arquivo proibido adicionado ao git:"
+            echo "$NOVOS"
+            exit 1
+          fi
+          echo "nenhum arquivo proibido no diff"
+
+  # Unico check obrigatorio na branch protection. Existe porque matriz muda de
+  # tamanho: exigir "testes / portal-gestao" pelo nome trava o merge no dia em
+  # que um produto nasce, some ou e renomeado.
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    needs: [testes, migrations, n8n, segredos]
+    if: always()
+    steps:
+      - name: conferir resultado de cada job
+        run: |
+          set -euo pipefail
+          echo "testes:     ${{ needs.testes.result }}"
+          echo "migrations: ${{ needs.migrations.result }}"
+          echo "n8n:        ${{ needs.n8n.result }}"
+          echo "segredos:   ${{ needs.segredos.result }}"
+          for r in "${{ needs.testes.result }}" \
+                   "${{ needs.migrations.result }}" \
+                   "${{ needs.n8n.result }}" \
+                   "${{ needs.segredos.result }}"; do
+            if [ "$r" != "success" ]; then
+              echo "::error::gate vermelho"
+              exit 1
+            fi
+          done
+          echo "gate verde"
