@@ -635,3 +635,55 @@ def test_sonda_de_recusa_ignora_pagina_quebrada():
     page = MagicMock()
     page.get_by_text.side_effect = RuntimeError("pagina fechada")
     driver._levantar_se_recusado(page)
+
+
+def test_sonda_ignora_recusa_escondida_no_dom():
+    """19/09 (sim 4459e2f3): o template do modal de recusa fica no DOM com rect
+    0x0 mesmo sem recusa. `get_by_text(...).count()` casava o escondido e o
+    cliente saia "Credito recusado" sem ter sido recusado."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = MagicMock()
+    loc = MagicMock()
+    loc.count.return_value = 2
+    loc.nth.return_value.is_visible.return_value = False
+    page.get_by_text.return_value = loc
+
+    driver._levantar_se_recusado(page)  # nao levanta
+
+
+def test_sonda_levanta_com_recusa_visivel():
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = MagicMock()
+    loc = MagicMock()
+    loc.count.return_value = 1
+    loc.nth.return_value.is_visible.return_value = True
+    page.get_by_text.return_value = loc
+
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._levantar_se_recusado(page)
+    assert ei.value.codigo == "credito_recusado"
+
+
+def test_resultado_nao_le_recusa_escondida_no_html_do_live():
+    """No live o `_resultados_de_html` recebe `texto + html` e o html cru traz o
+    template de recusa escondido. A sonda de recusa tem de olhar o TEXTO visivel;
+    o parser continua usando o html (sim 4459e2f3)."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    html = (
+        '<p class="text-center">Nao conseguimos seguir com analise do '
+        "financiamento</p>" + FIXTURE.read_text(encoding="utf-8")
+    )
+    res = driver._resultados_de_html(html, _sol(), texto_visivel="24x de R$ 1.212,76")
+
+    assert [r.prazo_meses for r in res] == [24, 36, 48]
+
+
+def test_resultado_le_recusa_quando_o_html_e_a_unica_fonte():
+    """Caminho de fixture (sem texto_visivel): o html E a tela, entao a recusa
+    real continua sendo detectada."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._resultados_de_html(
+            FIXTURE_RECUSA.read_text(encoding="utf-8"), _sol()
+        )
+    assert ei.value.codigo == "credito_recusado"

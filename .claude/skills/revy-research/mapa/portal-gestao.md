@@ -1,6 +1,6 @@
 # portal-gestao · 181 rotas · 26 modelos · 6 workers · 35 flags · 27 migrations · 63 templates
 
-Gerado de `9c72440`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `64812bd`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0027_perfil_avatar_foto`
 
 ## Rotas
