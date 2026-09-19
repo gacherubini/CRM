@@ -78,3 +78,5 @@ escrever migration com `batch_alter_table`.
 | configurar acesso read-only ao banco de producao numa maquina nova, ou psql responde "definition of service not found" | `2026-09-15-acesso-readonly-prod-fly.md` |
 | chamada do modelo do bot no n8n volta 400 do OpenCode Go (missing x-opencode-session) | `2026-09-16-opencode-go-exige-x-opencode-session.md` |
 | bot responde vazio ou /v1/operacao/responder devolve 422 texto com modelo de raciocinio | `2026-09-16-modelo-que-pensa-nao-cabe-no-teto-250.md` |
+| rodar script python via fly ssh console | `2026-09-19-fly-ssh-script-em-tmp-precisa-pythonpath.md` |
+| harness bash que roda nos dois SOs | `2026-09-19-harness-escolhe-python-por-execucao.md` |
