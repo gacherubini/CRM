@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -50,6 +51,15 @@ SEM_OFERTA = re.compile(
     r"N[ãa]o h[áa] (oferta|cr[ée]dito)|sem oferta|proposta (recusada|negada|reprovada)|"
     r"cr[ée]dito n[ãa]o aprovado|CPF inv[áa]lido|"
     r"n[ãa]o temos uma oferta|crit[ée]rios m[íi]nimos",
+    re.I,
+)
+# Erro do portal, nao do robo: a analise nao acha os parametros de prazo do
+# agente/vendedor e a tela nao rende parcela nenhuma (19/09, agente 1314).
+# Recusa de credito e parser quebrado sao outra coisa; aqui falta config do
+# agente na Omni. IntervencaoNecessaria para nao queimar login em retry cego.
+PROPOSTA_NAO_ENCONTRADA = re.compile(
+    r"Proposta n[ãa]o encontrada|"
+    r"Par[âa]metros de prazo n[ãa]o localizados",
     re.I,
 )
 
@@ -208,6 +218,11 @@ class OmniDriver(PlaywrightBankDriver):
         if SEM_OFERTA.search(texto or "") and not parse_ofertas(texto):
             raise RejeicaoNegocio(
                 "credito_recusado", "Omni não aprovou crédito para este cliente"
+            )
+        if PROPOSTA_NAO_ENCONTRADA.search(texto or ""):
+            raise IntervencaoNecessaria(
+                "omni_proposta_nao_encontrada",
+                f"Omni nao achou os parametros de prazo do agente: {_resumo_painel(texto)}",
             )
         ofertas = parse_ofertas(texto)
         if not ofertas:
@@ -478,12 +493,31 @@ class OmniDriver(PlaywrightBankDriver):
                 "campo_nao_encontrado", "campo valor de venda não aceitou digitação"
             )
         page.locator("[testid='continue-simulation']").first.click()
-        page.wait_for_timeout(8_000)
-        if "resultado" not in (page.url or ""):
+        if not self._aguardar_resultado(page):
             raise ErroTransitorio(
                 "valor_nao_confirmado", "Omni não avançou ao resultado"
             )
         self._evento(ctx, "valor_ok", "Valor de venda Omni confirmado.", page)
+
+    def _aguardar_resultado(self, page, timeout_ms: int | None = None) -> bool:
+        """Espera a analise de perfil terminar e a tela de resultado entrar.
+
+        Depois do valor o portal roda "Analisando o perfil do cliente" (bureau),
+        a etapa longa da rodada (10/09: ~120s no total). Esperar 8s cravados
+        derrubava a rodada no meio da analise com `valor_nao_confirmado`
+        (19/09, CPF novo). Espera a condicao, com o orcamento de ofertas.
+        """
+        orcamento = (
+            timeout_ms
+            if timeout_ms is not None
+            else int(getattr(config, "OFERTAS_TIMEOUT_MS", 240_000))
+        )
+        fim = time.monotonic() + orcamento / 1000.0
+        while time.monotonic() < fim:
+            if "resultado" in (page.url or ""):
+                return True
+            page.wait_for_timeout(1_000)
+        return "resultado" in (page.url or "")
 
     def _passo_entrada(self, page, sol, ctx) -> None:
         # O portal escolhe 30% por padrão; só mexe quando o pedido exige entrada.

@@ -152,6 +152,22 @@ def test_driver_painel_ilegivei_pede_intervencao():
     assert exc.value.codigo == "ofertas_ilegiveis"
 
 
+def test_proposta_nao_encontrada_pede_intervencao():
+    """O portal devolve o modal "Proposta nao encontrada: parametros de prazo
+    nao localizados para o agente X" (19/09). Nao e recusa de credito nem
+    parser quebrado: aponta para config do agente na Omni."""
+    driver = OmniDriver(
+        html_simulacao=(
+            "Simulação de financiamento\nNenhuma parcela disponível\n"
+            "Proposta não encontrada\nParâmetros de prazo não localizados "
+            "para o agente 1314 durante a simulação"
+        )
+    )
+    with pytest.raises(IntervencaoNecessaria) as exc:
+        driver.simular(_sol(), None)
+    assert exc.value.codigo == "omni_proposta_nao_encontrada"
+
+
 def test_driver_valida_solicitacao():
     driver = OmniDriver(html_simulacao=OFERTAS_REAIS)
     with pytest.raises(RejeicaoNegocio):
@@ -185,3 +201,39 @@ def test_omni_registrado_como_real():
     finally:
         _cred.configuracao_completa = _orig
     assert [nome for nome, _ in pares] == ["omni"]
+
+
+# --- espera do resultado -----------------------------------------------------
+
+
+def test_aguardar_resultado_espera_a_analise_do_perfil():
+    """Depois do valor o portal roda "Analisando o perfil do cliente" (bureau):
+    esperar 8s cravados derrubava a rodada no meio da analise (19/09, CPF novo)
+    em vez de esperar a tela de resultado."""
+    driver = OmniDriver()
+
+    class Page:
+        def __init__(self):
+            self.esperas = 0
+
+        @property
+        def url(self):
+            return [
+                "https://omni/simulacao/geral/valor-veiculo",
+                "https://omni/simulacao/geral/valor-veiculo",
+                "https://omni/simulacao/resultado-simulacao",
+            ][min(self.esperas, 2)]
+
+        def wait_for_timeout(self, ms):
+            self.esperas += 1
+
+    page = Page()
+    assert driver._aguardar_resultado(page, timeout_ms=10_000) is True
+    assert page.esperas >= 2, "nao pode desistir antes da analise terminar"
+
+
+def test_aguardar_resultado_desiste_no_orcamento():
+    driver = OmniDriver()
+    page = MagicMock()
+    page.url = "https://omni/simulacao/geral/valor-veiculo"
+    assert driver._aguardar_resultado(page, timeout_ms=0) is False
