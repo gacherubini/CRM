@@ -1,0 +1,11 @@
+{
+  "name": "revy-n8n-testes",
+  "private": true,
+  "description": "So existe para fixar a versao do motor de expressoes que os test_*.js usam. Nao e um pacote publicavel.",
+  "scripts": {
+    "test": "for t in test_*.js; do node \"$t\" || exit 1; done"
+  },
+  "dependencies": {
+    "@n8n/tournament": "1.9.1"
+  }
+}

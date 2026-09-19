@@ -1,0 +1,170 @@
+# Publica o workflow do n8n no n8n2037.
+#
+# Porte fiel de deploy/fly/3vm/prepare-workflow.ps1 + upload-and-import-workflow.ps1,
+# com as duas armadilhas ja conhecidas tratadas explicitamente:
+#
+#   1. `n8n import:workflow` DESATIVA o workflow, e `publish:workflow` nao reativa.
+#      So `update:workflow --active=true` liga. Sem esse passo o webhook responde
+#      404 para sempre e a Evolution CANCELA o retry no 404 — bot mudo.
+#   2. Reiniciar o n8n2037 custa ~6 min de 404 ate o webhook registrar de novo.
+#      O job espera esse retorno antes de dizer que deu certo, em vez de
+#      terminar verde com o bot morto.
+name: Deploy n8n
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "n8n/**"
+      - "deploy/fly/3vm/prepare-workflow.ps1"
+      - "deploy/fly/3vm/upload-and-import-workflow.ps1"
+      - ".github/workflows/deploy-n8n.yml"
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "Qual workflow publicar"
+        type: choice
+        options: [production, test, cloud, preview]
+        default: production
+
+concurrency:
+  group: deploy-n8n
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  N8N_APP: n8n2037
+  MODO: ${{ inputs.modo || 'production' }}
+
+jobs:
+  publicar:
+    name: publicar workflow
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: instalar @n8n/tournament
+        working-directory: n8n
+        run: npm install --no-audit --no-fund
+
+      # Rede de seguranca: se o canonico mudou de um jeito que o motor do n8n
+      # nao parseia, o import passa e o bot fica mudo. Reprova antes de subir.
+      - name: validar antes de publicar
+        run: |
+          set -euo pipefail
+          python n8n/validate_workflow.py
+          python n8n/validate_test_workflow.py
+          python n8n/validate_workflow_cloud.py
+          python n8n/validate_preview_workflow.py
+          for t in n8n/test_*.js; do node "$t"; done
+
+      # O .ready.json e gerado, nunca commitado (AGENTS.md secao 5).
+      - name: montar .secrets.local
+        run: |
+          umask 077
+          printf 'CHATBOT_WEBHOOK_TOKEN=%s\n' "$CHATBOT_WEBHOOK_TOKEN" >  deploy/fly/3vm/.secrets.local
+          printf 'EVOLUTION_API_KEY=%s\n'     "$EVOLUTION_API_KEY"     >> deploy/fly/3vm/.secrets.local
+        env:
+          CHATBOT_WEBHOOK_TOKEN: ${{ secrets.CHATBOT_WEBHOOK_TOKEN }}
+          EVOLUTION_API_KEY: ${{ secrets.EVOLUTION_API_KEY }}
+
+      - name: gerar o .ready.json
+        shell: pwsh
+        run: ./deploy/fly/3vm/prepare-workflow.ps1 -Mode $env:MODO
+
+      - name: descobrir id e caminho do webhook
+        id: wf
+        run: |
+          set -euo pipefail
+          case "$MODO" in
+            test)    ARQ=workflow-fly-test.ready.json ;;
+            cloud)   ARQ=workflow-cloud.ready.json ;;
+            preview) ARQ=workflow-preview.ready.json ;;
+            *)       ARQ=workflow-fly.ready.json ;;
+          esac
+          CAMINHO="deploy/fly/3vm/$ARQ"
+          ID=$(jq -r '.id' "$CAMINHO")
+          HOOK=$(jq -r '[.nodes[] | select(.type | test("webhook";"i")) | .parameters.path] | map(select(. != null)) | first // empty' "$CAMINHO")
+          test -n "$ID" && test "$ID" != "null"
+          echo "arquivo=$CAMINHO" >> "$GITHUB_OUTPUT"
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+          echo "hook=$HOOK" >> "$GITHUB_OUTPUT"
+          echo "workflow $ID, webhook '${HOOK:-nao encontrado}'"
+
+      - name: importar, publicar e ATIVAR
+        run: |
+          set -euo pipefail
+          ID="${{ steps.wf.outputs.id }}"
+          LOCAL="${{ steps.wf.outputs.arquivo }}"
+          REMOTO="/tmp/wf-${GITHUB_RUN_ID}.json"
+
+          MACHINE=$(flyctl machine list -a "$N8N_APP" --json \
+            | jq -r '[.[] | select(.state=="started")][0].id')
+          test -n "$MACHINE" && test "$MACHINE" != "null" || { echo "::error::$N8N_APP sem machine iniciada"; exit 1; }
+          echo "machine: $MACHINE"
+
+          flyctl ssh sftp put -a "$N8N_APP" "$LOCAL" "$REMOTO"
+
+          # HOME=/home/node para os dados caírem no volume em /home/node/.n8n.
+          # N8N_USER_FOLDER NAO serve aqui: cria .n8n/.n8n aninhado.
+          EXEC="flyctl machine exec $MACHINE -a $N8N_APP"
+          $EXEC "env HOME=/home/node n8n import:workflow --input=$REMOTO" --timeout 180
+          $EXEC "env HOME=/home/node n8n publish:workflow --id=$ID" --timeout 180
+          # Deprecado segundo o proprio n8n. Ignore: nesta versao e o unico que liga.
+          $EXEC "env HOME=/home/node n8n update:workflow --id=$ID --active=true" --timeout 180
+          $EXEC "env HOME=/home/node n8n list:workflow" --timeout 90
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_N8N }}
+
+      - name: reiniciar para o webhook registrar
+        run: flyctl apps restart "$N8N_APP"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_N8N }}
+
+      # Sem esta espera o job terminaria verde com o bot mudo — que e exatamente
+      # o modo de falha que ja aconteceu antes.
+      - name: esperar o webhook voltar
+        if: steps.wf.outputs.hook != ''
+        run: |
+          set -uo pipefail
+          URL="https://${N8N_APP}.fly.dev/webhook/${{ steps.wf.outputs.hook }}"
+          echo "esperando $URL sair do 404 (conte ate ~8 min)"
+          for i in $(seq 1 60); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -X POST "$URL" -d '{}' -H 'content-type: application/json' || echo 000)
+            echo "tentativa $i: HTTP $CODE"
+            # Qualquer coisa que nao seja 404/000 significa que a rota existe.
+            case "$CODE" in
+              404|000) sleep 10 ;;
+              *) echo "webhook registrado (HTTP $CODE)"; exit 0 ;;
+            esac
+          done
+          echo "::error::webhook ainda em 404 depois de ~10min. A Evolution cancela retry no 404 — o bot esta mudo."
+          exit 1
+
+      - name: apagar o .secrets.local
+        if: always()
+        run: rm -f deploy/fly/3vm/.secrets.local deploy/fly/3vm/*.ready.json
+
+      - name: resumo
+        if: always()
+        run: |
+          {
+            echo "### n8n ($MODO)"
+            echo ""
+            echo "- workflow: \`${{ steps.wf.outputs.id }}\`"
+            echo "- webhook: \`${{ steps.wf.outputs.hook || 'nao detectado' }}\`"
+            echo "- commit: \`${{ github.sha }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

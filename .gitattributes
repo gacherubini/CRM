@@ -1,2 +1,4 @@
 deploy/fly/**/*.sh text eol=lf
 .githooks/* text eol=lf
+deploy/ci/*.sh text eol=lf
+.github/workflows/*.yml text eol=lf
