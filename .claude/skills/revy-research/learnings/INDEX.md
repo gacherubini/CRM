@@ -78,3 +78,4 @@ escrever migration com `batch_alter_table`.
 | configurar acesso read-only ao banco de producao numa maquina nova, ou psql responde "definition of service not found" | `2026-09-15-acesso-readonly-prod-fly.md` |
 | chamada do modelo do bot no n8n volta 400 do OpenCode Go (missing x-opencode-session) | `2026-09-16-opencode-go-exige-x-opencode-session.md` |
 | bot responde vazio ou /v1/operacao/responder devolve 422 texto com modelo de raciocinio | `2026-09-16-modelo-que-pensa-nao-cabe-no-teto-250.md` |
+| print de diagnostico do driver mostra a tela errada, ou a resposta do portal nao aparece no screenshot | `2026-09-19-print-do-driver-sai-da-tela-errada.md` |

@@ -34,6 +34,11 @@ aqui** — cifradas — e em nenhum outro produto.
   título responde "visível" e o clique seguinte estoura o timeout sem explicação. Para saber
   se um diálogo está aberto, meça a altura dele. Detalhe e receita de diagnóstico:
   `.claude/skills/revy-research/learnings/2026-09-04-is-visible-mente-com-modal-recortado.md`.
+- **Print de diagnóstico não abre o scroll interno do modal.** O Motrix renderiza a
+  recusa abaixo da dobra do dialog: `is_visible()` diz True, mas o
+  `mat-mdc-dialog-surface` cobre o aviso e o screenshot sai do formulário em vez da
+  recusa. Role até o alvo (`scroll_into_view_if_needed`) **antes** de fotografar. Detalhe:
+  `.claude/skills/revy-research/learnings/2026-09-19-print-do-driver-sai-da-tela-errada.md`.
 - **Não espere modal auto-abrir: a sessão quente muda o comportamento.** Com
   `storage_state` salvo o go!PAN não abre o modal de agente/operador; com sessão fria abre.
   Abra pelo controle fixo da tela. Vale para qualquer portal com `MOTOR_WARM_SESSION=1`.
