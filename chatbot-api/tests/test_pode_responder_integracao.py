@@ -1,5 +1,7 @@
 """O bug do smoke, capturado em teste: o token da plataforma tem de achar a
 conversa da loja da `instance`, não a de uma loja fixa (spec §6.2)."""
+import pytest
+
 from app import servico
 
 
@@ -102,13 +104,11 @@ def test_credencial_nova_de_loja_alcanca_a_propria_loja_e_so_ela(client, db, loj
     assert proibido.status_code == 404, proibido.text
 
 
-def test_credencial_de_loja_inexistente_recusa():
-    import pytest
-    from app.db import SessionLocal
-
-    s = SessionLocal()
-    try:
-        with pytest.raises(ValueError):
-            servico.criar_credencial_loja(s, "nao-existe")
-    finally:
-        s.close()
+# Usa a fixture `db`, como os vizinhos. A versao anterior abria
+# `app.db.SessionLocal`, que ignora o override do conftest e cai no default
+# `sqlite:///./chatbot.db` — um ARQUIVO. Passava so em maquina onde esse arquivo
+# ja existia de uma rodada antiga, e morria em checkout limpo com
+# `no such table: lojas`.
+def test_credencial_de_loja_inexistente_recusa(db):
+    with pytest.raises(ValueError):
+        servico.criar_credencial_loja(db, "nao-existe")
