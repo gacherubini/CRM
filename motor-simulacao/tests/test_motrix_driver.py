@@ -121,12 +121,30 @@ def test_driver_financiado_desconta_entrada():
 
 
 def test_recusa_do_portal_vira_rejeicao_de_negocio():
-    """A captura real de 04/09: o Motrix respondeu que nao ha oferta."""
+    """A captura real de 04/09: o Motrix respondeu que nao ha oferta.
+
+    `credito_recusado` e o unico codigo que a tela do Portal mapeia para
+    "Credito recusado" (`_veredito_do_codigo`); qualquer outro cai em "Falhou".
+    Recusa de credito tem de aparecer como recusa.
+    """
     texto = FIXTURE_SEM_OFERTA.read_text(encoding="utf-8")
     driver = MotrixDriver(html_simulacao=texto)
     with pytest.raises(RejeicaoNegocio) as exc:
         driver.simular(_sol())
-    assert exc.value.codigo == "motrix_sem_oferta"
+    assert exc.value.codigo == "credito_recusado"
+
+
+def test_cliente_nao_elegivel_vira_recusa_de_negocio():
+    """Print real de 18/09 (sim afa4e02d): o passo Consulta CPF responde
+    "Cliente nao elegivel". E decisao de credito — o cliente nao passou — nao
+    defeito de robo. Sair como erro tecnico (`consulta_cpf_sem_resposta`) inflava
+    a falha do Motrix e mostrava "Falhou" para uma recusa."""
+    driver = MotrixDriver(
+        html_simulacao="Cadastro Inicial\nCPF 095.794.068-80\nCliente não elegível"
+    )
+    with pytest.raises(RejeicaoNegocio) as exc:
+        driver.simular(_sol())
+    assert exc.value.codigo == "credito_recusado"
 
 
 def test_painel_ilegivel_nao_vira_recusa_de_credito():
@@ -336,3 +354,20 @@ def test_consulta_cpf_sem_resposta_registra_print(monkeypatch):
     assert eventos[-1]["etapa"] == "consulta_cpf_sem_resposta"
     assert eventos[-1]["nivel"] == "erro"
     assert eventos[-1]["screenshot_conteudo"] == b"jpeg"
+
+
+def test_passo_consulta_cpf_reconhece_nao_elegivel(monkeypatch):
+    """A tela "Cliente nao elegivel" nao pode cair em timeout de 120s: o portal
+    respondeu, e a resposta e recusa de credito. Antes disso o passo esperava
+    pelo texto positivo e so saia como `consulta_cpf_sem_resposta`."""
+    driver = MotrixDriver(timeout_ms=20_000)
+    monkeypatch.setattr(driver, "_preencher", lambda *a, **k: None)
+    monkeypatch.setattr(driver, "_aguardar_habilitado", lambda *a, **k: None)
+
+    page = MagicMock()
+    page.wait_for_function.return_value = None
+    page.inner_text.return_value = "Dados do Cliente\nCliente não elegível"
+
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._passo_consulta_cpf(page, _sol(), None)
+    assert ei.value.codigo == "credito_recusado"

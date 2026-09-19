@@ -131,4 +131,4 @@ Os cinco labels canônicos, sem renomear. Ver `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Contexto único: `CONTEXT.md` na raiz + `docs/adr/`. Ver `docs/agents/domain.md`.
+Contexto único: `CONTEXT.md` na raiz + `docs/referencia-viva/adr/`. Ver `docs/agents/domain.md`.

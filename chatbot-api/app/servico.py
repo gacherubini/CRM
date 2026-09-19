@@ -8,6 +8,7 @@ import os
 import re
 import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
@@ -16,6 +17,7 @@ from sqlalchemy import and_, or_, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import config
 from app.auth import hash_token
 from app.models_db import (
     CatalogAttribution,
@@ -1739,6 +1741,124 @@ def _enviar_texto_saida(
         ) from exc
 
 
+@dataclass
+class _SaidaHumanaPreparada:
+    """Estado comum a qualquer envio humano (texto ou áudio)."""
+
+    conversa: Conversa | None
+    canal_id: str | None
+    instance_envio: str
+    ja_persistida: Mensagem | None = None
+
+
+def _resolver_canal_conversa_humana(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    *,
+    instance: str | None,
+) -> str | None:
+    """Canal do envio, adotando a única conversa existente quando não há instance."""
+    canal_id = _resolver_canal_id_escopo(db, loja_id, instance=instance)
+    # Sem instance: reutiliza canal só se houver conversa única (evita .first() multi-WA).
+    if canal_id is None:
+        existentes = _listar_conversas_telefone(db, loja_id, telefone)
+        unica = _exigir_conversa_unica(existentes, canal_id=None)
+        if unica is not None:
+            canal_id = unica.canal_id
+    return canal_id
+
+
+def _preparar_saida_humana(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    *,
+    provider_message_id: str,
+    instance: str | None,
+    ator: str | None,
+) -> _SaidaHumanaPreparada:
+    """Dedupe, conversa e pausa do bot — o núcleo reusado por todo envio humano.
+
+    Já existe mensagem com a mesma chave: devolve ``ja_persistida`` sem reenviar.
+    """
+    canal_id = _resolver_canal_conversa_humana(
+        db, loja_id, telefone, instance=instance
+    )
+    existente = _mensagem_existente(
+        db, loja_id, provider_message_id, canal_id=canal_id
+    )
+    if existente is not None:
+        # Já enviada (ou persistida em tentativa anterior): não reenvia ao provedor.
+        return _SaidaHumanaPreparada(
+            conversa=db.get(Conversa, existente.conversa_id),
+            canal_id=existente.canal_id,
+            instance_envio="",
+            ja_persistida=existente,
+        )
+
+    conversa = _get_or_create_conversa(
+        db, loja_id, telefone, canal_id=canal_id
+    )
+    # Humano assume: pausa bot (mesmo contrato do from_me atendente).
+    conversa.bot_ativo = False
+    conversa.status = "handoff"
+    conversa.atualizada_em = datetime.now(timezone.utc)
+    if ator and not conversa.responsavel:
+        conversa.responsavel = ator[:120]
+    return _SaidaHumanaPreparada(
+        conversa=conversa,
+        canal_id=conversa.canal_id,
+        instance_envio=_resolver_instance_envio(db, loja_id, conversa),
+    )
+
+
+def _persistir_saida_humana(db: Session, mensagem: Mensagem) -> Mensagem | None:
+    """Persiste a saída humana. Devolve a existente se a chave colidir (dedupe)."""
+    db.add(mensagem)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        existente = _mensagem_existente(
+            db,
+            mensagem.loja_id,
+            mensagem.provider_message_id,
+            canal_id=mensagem.canal_id,
+        )
+        if existente is None:
+            raise
+        return existente
+    return None
+
+
+def _resposta_saida_humana_duplicada(
+    db: Session,
+    existente: Mensagem,
+    *,
+    telefone: str,
+    ator: str | None,
+) -> dict:
+    conversa = db.get(Conversa, existente.conversa_id)
+    resposta = {
+        "duplicada": True,
+        "mensagem_id": existente.id,
+        "telefone": telefone,
+        "texto": existente.texto,
+        "bot_ativo": bool(conversa.bot_ativo) if conversa else False,
+        "status": conversa.status if conversa else "handoff",
+        "enviado": True,
+        "canal_id": existente.canal_id,
+        "ator": ator,
+    }
+    # Só o áudio acrescenta campos: o contrato do texto fica idêntico ao de antes.
+    if existente.tipo == "audio":
+        resposta["tipo"] = existente.tipo
+        resposta["media_ref"] = existente.media_ref
+        resposta["duracao_segundos"] = existente.duracao_segundos
+    return resposta
+
+
 def enviar_mensagem_humana(
     db: Session,
     loja_id: str,
@@ -1749,13 +1869,13 @@ def enviar_mensagem_humana(
     instance: str | None = None,
     ator: str | None = None,
 ) -> dict:
-    """Persiste saída humana na conversa da loja, pausa o bot e envia via Evolution.
+    """Persiste saída humana na conversa da loja, pausa o bot e envia ao provedor.
 
     Escopo: somente a loja autenticada (token de serviço) + telefone.
     Idempotente por ``idempotency_key`` (provider_message_id = human:…).
-    Segunda chamada com a mesma chave não reenvia à Evolution (dedupe).
+    Segunda chamada com a mesma chave não reenvia ao provedor (dedupe).
 
-    Se a Evolution falhar após o commit: a mensagem permanece no histórico,
+    Se o provedor falhar após o commit: a mensagem permanece no histórico,
     o bot continua pausado (handoff) e a API responde 502 com detalhe.
     """
     from app import provisioning
@@ -1785,48 +1905,26 @@ def enviar_mensagem_humana(
         raise HTTPException(status_code=422, detail="texto inválido")
 
     provider_message_id = _provider_id_humano(idempotency_key)
-    canal_id = _resolver_canal_id_escopo(db, loja_id, instance=instance)
-
-    # Sem instance: reutiliza canal só se houver conversa única (evita .first() multi-WA).
-    if canal_id is None:
-        existentes = _listar_conversas_telefone(db, loja_id, telefone_norm)
-        unica = _exigir_conversa_unica(existentes, canal_id=None)
-        if unica is not None:
-            canal_id = unica.canal_id
-
-    existente = _mensagem_existente(
-        db, loja_id, provider_message_id, canal_id=canal_id
+    saida = _preparar_saida_humana(
+        db,
+        loja_id,
+        telefone_norm,
+        provider_message_id=provider_message_id,
+        instance=instance,
+        ator=ator,
     )
-    if existente is not None:
-        # Já enviada (ou persistida em tentativa anterior): não reenvia Evolution.
-        conversa = db.get(Conversa, existente.conversa_id)
-        return {
-            "duplicada": True,
-            "mensagem_id": existente.id,
-            "telefone": telefone_norm,
-            "texto": existente.texto,
-            "bot_ativo": bool(conversa.bot_ativo) if conversa else False,
-            "status": conversa.status if conversa else "handoff",
-            "enviado": True,
-            "canal_id": existente.canal_id,
-            "ator": ator,
-        }
+    if saida.ja_persistida is not None:
+        return _resposta_saida_humana_duplicada(
+            db, saida.ja_persistida, telefone=telefone_norm, ator=ator
+        )
 
-    conversa = _get_or_create_conversa(
-        db, loja_id, telefone_norm, canal_id=canal_id
-    )
-    # Humano assume: pausa bot (mesmo contrato do from_me atendente).
-    conversa.bot_ativo = False
-    conversa.status = "handoff"
-    conversa.atualizada_em = datetime.now(timezone.utc)
-    if ator and not conversa.responsavel:
-        conversa.responsavel = ator[:120]
-
+    conversa = saida.conversa
+    assert conversa is not None
     mensagem_id = str(uuid.uuid4())
     texto_persistido = mascarar_cpf(texto_limpo) or texto_limpo
-    instance_envio = _resolver_instance_envio(db, loja_id, conversa)
 
-    db.add(
+    existente = _persistir_saida_humana(
+        db,
         Mensagem(
             id=mensagem_id,
             loja_id=loja_id,
@@ -1835,35 +1933,18 @@ def enviar_mensagem_humana(
             direcao="saida",
             provider_message_id=provider_message_id,
             texto=texto_persistido,
-        )
+        ),
     )
-    try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        existente = _mensagem_existente(
-            db, loja_id, provider_message_id, canal_id=conversa.canal_id
+    if existente is not None:
+        return _resposta_saida_humana_duplicada(
+            db, existente, telefone=telefone_norm, ator=ator
         )
-        if existente is None:
-            raise
-        conversa = db.get(Conversa, existente.conversa_id)
-        return {
-            "duplicada": True,
-            "mensagem_id": existente.id,
-            "telefone": telefone_norm,
-            "texto": existente.texto,
-            "bot_ativo": bool(conversa.bot_ativo) if conversa else False,
-            "status": conversa.status if conversa else "handoff",
-            "enviado": True,
-            "canal_id": existente.canal_id,
-            "ator": ator,
-        }
 
     # Após persistir + pausar: push real. Falha → 502; não desfaz handoff.
     _enviar_texto_saida(
         db,
         loja_id,
-        instance=instance_envio,
+        instance=saida.instance_envio,
         number=telefone_norm,
         text=texto_limpo,
         mensagem_id=mensagem_id,
@@ -1880,8 +1961,371 @@ def enviar_mensagem_humana(
         "enviado": True,
         "canal_id": conversa.canal_id,
         "ator": ator,
-        "evolution_instance": instance_envio,
+        "evolution_instance": saida.instance_envio,
     }
+
+
+def _enviar_audio_saida(
+    db: Session,
+    loja_id: str,
+    *,
+    instance: str,
+    number: str,
+    audio: bytes,
+    filename: str,
+    mime: str,
+    mensagem_id: str,
+    canal_id: str | None,
+) -> None:
+    """Push do áudio pelo transporte da loja. Falha → 502, histórico preservado."""
+    from app.whatsapp_outbound import WhatsAppOutboundError, outbound_para_loja
+
+    try:
+        outbound_para_loja(db, loja_id).send_audio(
+            instance=instance,
+            number=number,
+            audio=audio,
+            filename=filename,
+            mime=mime,
+        )
+    except WhatsAppOutboundError as exc:
+        logger.warning(
+            "audio_humano_falhou loja=%s mensagem=%s code=%s",
+            loja_id,
+            mensagem_id,
+            getattr(exc, "code", None) or "cloud_media_failed",
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": getattr(exc, "code", None) or "cloud_media_failed",
+                "message": str(exc) or "falha ao enviar o áudio",
+                "mensagem_id": mensagem_id,
+                "bot_ativo": False,
+                "status": "handoff",
+                "enviado": False,
+                "canal_id": canal_id,
+                "preservado_no_historico": True,
+            },
+        ) from exc
+
+
+def enviar_audio_humano(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    conteudo: bytes,
+    *,
+    idempotency_key: str,
+    mime: str | None = None,
+    duracao_segundos: float | None = None,
+    instance: str | None = None,
+    ator: str | None = None,
+    media=None,
+) -> dict:
+    """Persiste o Áudio do Vendedor, pausa o bot e envia pela Cloud API.
+
+    Só Modo 2 (ADR-0002): fora dele responde 422. A conversão para ogg/opus e o
+    arquivo no volume ficam no port de mídia; aqui só a orquestração. Idempotente
+    por chave, igual ao texto.
+    """
+    from app import provisioning
+    from app.audio_humano import AudioMediaError, get_audio_media_port
+    from app.hardening import normalizar_telefone_webhook
+    from app.rodizio import loja_opera_modo2
+
+    if not provisioning.allows_outbound_whatsapp(db, loja_id):
+        raise HTTPException(
+            status_code=423,
+            detail={
+                "code": "store_not_operational",
+                "message": "loja não operacional",
+                "loja_operacional": False,
+            },
+        )
+    if not loja_opera_modo2(db, loja_id):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "audio_somente_cloud",
+                "message": "Áudio do Vendedor só é suportado no Modo 2 (Cloud API)",
+            },
+        )
+
+    try:
+        telefone_norm = normalizar_telefone_webhook(telefone)
+    except Exception:
+        raise HTTPException(status_code=422, detail="telefone inválido") from None
+
+    if not conteudo:
+        raise HTTPException(status_code=422, detail="áudio vazio")
+    if len(conteudo) > config.AUDIO_MAX_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "code": "audio_muito_grande",
+                "message": "áudio acima do limite permitido",
+            },
+        )
+    if duracao_segundos is not None and (
+        duracao_segundos <= 0
+        or duracao_segundos > config.AUDIO_MAX_DURATION_SECONDS
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "audio_muito_longo",
+                "message": "duração de áudio acima do limite permitido",
+            },
+        )
+
+    provider_message_id = _provider_id_humano(idempotency_key)
+    saida = _preparar_saida_humana(
+        db,
+        loja_id,
+        telefone_norm,
+        provider_message_id=provider_message_id,
+        instance=instance,
+        ator=ator,
+    )
+    if saida.ja_persistida is not None:
+        return _resposta_saida_humana_duplicada(
+            db, saida.ja_persistida, telefone=telefone_norm, ator=ator
+        )
+
+    conversa = saida.conversa
+    assert conversa is not None
+    port = media or get_audio_media_port()
+    mensagem_id = str(uuid.uuid4())
+    try:
+        armazenado = port.armazenar(
+            conteudo,
+            mime=mime or "audio/webm",
+            loja_id=loja_id,
+            mensagem_id=mensagem_id,
+            duracao=duracao_segundos,
+        )
+    except AudioMediaError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "audio_invalido",
+                "message": str(exc) or "áudio inválido",
+            },
+        ) from exc
+
+    existente = _persistir_saida_humana(
+        db,
+        Mensagem(
+            id=mensagem_id,
+            loja_id=loja_id,
+            canal_id=conversa.canal_id,
+            conversa_id=conversa.id,
+            direcao="saida",
+            provider_message_id=provider_message_id,
+            texto=None,
+            tipo="audio",
+            media_ref=armazenado.media_ref,
+            duracao_segundos=armazenado.duracao_segundos,
+        ),
+    )
+    if existente is not None:
+        # Corrida de idempotência: descarta o arquivo que acabou de ser gravado.
+        port.apagar(armazenado.media_ref)
+        return _resposta_saida_humana_duplicada(
+            db, existente, telefone=telefone_norm, ator=ator
+        )
+
+    _enviar_audio_saida(
+        db,
+        loja_id,
+        instance=saida.instance_envio,
+        number=telefone_norm,
+        audio=armazenado.conteudo,
+        filename=f"{mensagem_id}.ogg",
+        mime=armazenado.mime,
+        mensagem_id=mensagem_id,
+        canal_id=conversa.canal_id,
+    )
+    logger.info(
+        "audio_humano_enviado loja=%s mensagem=%s bytes=%s duracao=%s canal=%s",
+        loja_id,
+        mensagem_id,
+        len(armazenado.conteudo),
+        armazenado.duracao_segundos,
+        conversa.canal_id,
+    )
+
+    return {
+        "duplicada": False,
+        "mensagem_id": mensagem_id,
+        "telefone": telefone_norm,
+        "texto": None,
+        "tipo": "audio",
+        "media_ref": armazenado.media_ref,
+        "duracao_segundos": armazenado.duracao_segundos,
+        "bot_ativo": False,
+        "status": "handoff",
+        "enviado": True,
+        "canal_id": conversa.canal_id,
+        "ator": ator,
+        "evolution_instance": saida.instance_envio,
+    }
+
+
+def _parse_range(range_header: str | None, tamanho: int):
+    """Interpreta ``Range: bytes=…``. None = sem range; "invalido" = 416."""
+    if not range_header or not range_header.strip().lower().startswith("bytes="):
+        return None
+    spec = range_header.split("=", 1)[1].split(",")[0].strip()
+    if "-" not in spec:
+        return None
+    inicio_s, fim_s = spec.split("-", 1)
+    try:
+        if inicio_s == "":
+            n = int(fim_s)
+            if n <= 0:
+                return "invalido"
+            return max(0, tamanho - n), tamanho - 1
+        inicio = int(inicio_s)
+        fim = int(fim_s) if fim_s else tamanho - 1
+    except ValueError:
+        return "invalido"
+    if inicio > fim or inicio >= tamanho:
+        return "invalido"
+    return inicio, min(fim, tamanho - 1)
+
+
+def _resposta_midia(conteudo: bytes, mime: str, range_header: str | None):
+    """(status, headers, corpo). Suporta requisição parcial para o player."""
+    faixa = _parse_range(range_header, len(conteudo))
+    if faixa == "invalido":
+        return 416, {"Accept-Ranges": "bytes", "Content-Range": f"bytes */{len(conteudo)}"}, b""
+    if faixa is not None:
+        inicio, fim = faixa
+        return (
+            206,
+            {
+                "Accept-Ranges": "bytes",
+                "Content-Range": f"bytes {inicio}-{fim}/{len(conteudo)}",
+            },
+            conteudo[inicio : fim + 1],
+        )
+    return 200, {"Accept-Ranges": "bytes"}, conteudo
+
+
+def baixar_midia_humana(
+    db: Session,
+    loja_id: str,
+    mensagem_id: str,
+    *,
+    range_header: str | None = None,
+    media=None,
+):
+    """Lê o áudio de uma mensagem da própria Loja. Devolve (status, headers, corpo, mime)."""
+    from app.audio_humano import AudioMediaError, get_audio_media_port
+
+    msg = db.get(Mensagem, mensagem_id)
+    if (
+        msg is None
+        or msg.loja_id != loja_id
+        or msg.tipo != "audio"
+        or not msg.media_ref
+    ):
+        raise HTTPException(status_code=404, detail="mídia não encontrada")
+
+    port = media or get_audio_media_port()
+    try:
+        conteudo, mime = port.ler(msg.media_ref)
+    except AudioMediaError as exc:
+        raise HTTPException(status_code=404, detail="mídia não encontrada") from exc
+
+    status, headers, corpo = _resposta_midia(conteudo, mime, range_header)
+    return status, headers, corpo, mime
+
+
+def _transcrever_bytes(conteudo: bytes, mime: str | None, provider) -> str:
+    import tempfile
+    from pathlib import Path
+
+    from app.audio_humano import sufixo_por_mime
+
+    with tempfile.TemporaryDirectory(prefix="revy-audio-saida-") as diretorio:
+        arquivo = Path(diretorio) / f"entrada{sufixo_por_mime(mime)}"
+        arquivo.write_bytes(conteudo)
+        texto = (provider.transcrever(arquivo, mime or "audio/ogg") or "").strip()
+    return texto
+
+
+def transcrever_midia_humana(
+    db: Session,
+    loja_id: str,
+    mensagem_id: str,
+    *,
+    media=None,
+    provider=None,
+) -> dict:
+    """Transcreve, sob demanda, o áudio de uma mensagem da própria Loja.
+
+    Idempotente: mensagem já transcrita não chama o provedor de novo.
+    """
+    from app.audio_humano import (
+        AudioMediaError,
+        get_audio_media_port,
+        get_transcription_provider,
+    )
+
+    msg = db.get(Mensagem, mensagem_id)
+    if (
+        msg is None
+        or msg.loja_id != loja_id
+        or msg.tipo != "audio"
+        or not msg.media_ref
+    ):
+        raise HTTPException(status_code=404, detail="mídia não encontrada")
+    if msg.transcricao:
+        return {
+            "mensagem_id": msg.id,
+            "transcricao": msg.transcricao,
+            "duplicada": True,
+        }
+
+    prov = provider if provider is not None else get_transcription_provider()
+    if prov is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "transcricao_indisponivel",
+                "message": "Transcrição não configurada",
+            },
+        )
+
+    port = media or get_audio_media_port()
+    try:
+        conteudo, mime = port.ler(msg.media_ref)
+    except AudioMediaError as exc:
+        raise HTTPException(status_code=404, detail="mídia não encontrada") from exc
+
+    try:
+        texto = _transcrever_bytes(conteudo, mime, prov)
+    except Exception:
+        logger.warning("transcricao de audio de saida falhou")
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "transcricao_falhou",
+                "message": "Não foi possível transcrever o áudio",
+            },
+        ) from None
+    if not texto:
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "transcricao_vazia", "message": "Transcrição vazia"},
+        )
+
+    msg.transcricao = texto[: config.WEBHOOK_MAX_TEXT_CHARS]
+    db.commit()
+    return {"mensagem_id": msg.id, "transcricao": msg.transcricao, "duplicada": False}
 
 
 def para_saida_mensagem(msg: Mensagem) -> dict:
@@ -1889,6 +2333,10 @@ def para_saida_mensagem(msg: Mensagem) -> dict:
         "id": msg.id,
         "direcao": msg.direcao,
         "texto": mascarar_cpf(msg.texto),
+        "tipo": msg.tipo,
+        "media_ref": msg.media_ref,
+        "duracao_segundos": msg.duracao_segundos,
+        "transcricao": msg.transcricao,
         "criada_em": msg.criada_em.isoformat() if msg.criada_em else None,
     }
 

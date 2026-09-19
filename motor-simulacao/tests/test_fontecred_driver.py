@@ -415,6 +415,26 @@ def test_recusa_de_credito_nao_vira_veiculo_nao_resolvido():
     assert ei.value.codigo == "credito_recusado"
 
 
+def test_passo_veiculo_sonda_recusa_antes_de_tocar_na_placa(monkeypatch):
+    """Se o modal de política de crédito já estiver na tela quando o passo do
+    veículo começa (o veículo fica em branco), a recusa tem de sair como negócio
+    ANTES de mexer na placa — senão o clique na placa morre no overlay e vira
+    `portal_falhou` técnico, que é o "tratado como erro" que não pode acontecer."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = MagicMock()
+
+    def recusa(_page):
+        raise RejeicaoNegocio("credito_recusado", "CPF fora da política")
+
+    monkeypatch.setattr(driver, "_levantar_se_recusado", recusa)
+
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._passo_veiculo(page, _sol())
+
+    assert ei.value.codigo == "credito_recusado"
+    page.get_by_label.assert_not_called()  # nao chegou a mexer na placa
+
+
 def test_modal_de_placa_tratado_dispensa_a_linha_com_botao():
     """Depois do modal escolhido nao sobra 'linha com botao'; clicar la era o bug."""
     driver = FontecredDriver(timeout_ms=20_000)
@@ -615,3 +635,55 @@ def test_sonda_de_recusa_ignora_pagina_quebrada():
     page = MagicMock()
     page.get_by_text.side_effect = RuntimeError("pagina fechada")
     driver._levantar_se_recusado(page)
+
+
+def test_sonda_ignora_recusa_escondida_no_dom():
+    """19/09 (sim 4459e2f3): o template do modal de recusa fica no DOM com rect
+    0x0 mesmo sem recusa. `get_by_text(...).count()` casava o escondido e o
+    cliente saia "Credito recusado" sem ter sido recusado."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = MagicMock()
+    loc = MagicMock()
+    loc.count.return_value = 2
+    loc.nth.return_value.is_visible.return_value = False
+    page.get_by_text.return_value = loc
+
+    driver._levantar_se_recusado(page)  # nao levanta
+
+
+def test_sonda_levanta_com_recusa_visivel():
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = MagicMock()
+    loc = MagicMock()
+    loc.count.return_value = 1
+    loc.nth.return_value.is_visible.return_value = True
+    page.get_by_text.return_value = loc
+
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._levantar_se_recusado(page)
+    assert ei.value.codigo == "credito_recusado"
+
+
+def test_resultado_nao_le_recusa_escondida_no_html_do_live():
+    """No live o `_resultados_de_html` recebe `texto + html` e o html cru traz o
+    template de recusa escondido. A sonda de recusa tem de olhar o TEXTO visivel;
+    o parser continua usando o html (sim 4459e2f3)."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    html = (
+        '<p class="text-center">Nao conseguimos seguir com analise do '
+        "financiamento</p>" + FIXTURE.read_text(encoding="utf-8")
+    )
+    res = driver._resultados_de_html(html, _sol(), texto_visivel="24x de R$ 1.212,76")
+
+    assert [r.prazo_meses for r in res] == [24, 36, 48]
+
+
+def test_resultado_le_recusa_quando_o_html_e_a_unica_fonte():
+    """Caminho de fixture (sem texto_visivel): o html E a tela, entao a recusa
+    real continua sendo detectada."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._resultados_de_html(
+            FIXTURE_RECUSA.read_text(encoding="utf-8"), _sol()
+        )
+    assert ei.value.codigo == "credito_recusado"

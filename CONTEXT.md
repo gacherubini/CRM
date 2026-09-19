@@ -202,3 +202,14 @@ _Avoid_: Contrato da organização, assinatura do usuário
 Registro administrativo da cobrança de uma loja, sem realizar o pagamento nem
 suspender automaticamente sua operação.
 _Avoid_: Sistema financeiro, pagamento automático, suspensão da loja
+
+**Áudio do Vendedor**:
+Mensagem de voz gravada pelo vendedor no Atendimento e entregue ao cliente pelo
+WhatsApp, preservada no histórico da conversa como qualquer outra mensagem.
+_Avoid_: Áudio do bot, biblioteca de áudios, anexo fora da conversa
+
+**Janela de Atendimento**:
+Período em que a Cloud API permite mensagem livre para um cliente, contado a
+partir da última mensagem dele; fora dela só sai template pago, que não carrega
+áudio.
+_Avoid_: Horário comercial, disponibilidade do vendedor

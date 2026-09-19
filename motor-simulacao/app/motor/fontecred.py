@@ -255,9 +255,17 @@ class FontecredDriver(PlaywrightBankDriver):
             raise RejeicaoNegocio("valor_obrigatorio", "Valor de venda é obrigatório")
 
     def _resultados_de_html(
-        self, html: str, sol: SolicitacaoSimulacao
+        self,
+        html: str,
+        sol: SolicitacaoSimulacao,
+        *,
+        texto_visivel: str | None = None,
     ) -> list[ResultadoDriver]:
-        if RECUSA_CREDITO.search(html or ""):
+        # O template do modal de recusa vive ESCONDIDO no HTML cru da página
+        # (rect 0x0). No live a sonda tem de olhar o TEXTO visivel; sem ele
+        # (caminho de fixture) o proprio html e a tela.
+        alvo = texto_visivel if texto_visivel is not None else html
+        if RECUSA_CREDITO.search(alvo or ""):
             raise RejeicaoNegocio(
                 "credito_recusado",
                 "Fontecred recusou: CPF fora da política de crédito",
@@ -379,7 +387,9 @@ class FontecredDriver(PlaywrightBankDriver):
                 except Exception:
                     texto = ""
                 html = page.content() or ""
-                resultados = self._resultados_de_html(texto + "\n" + html, sol)
+                resultados = self._resultados_de_html(
+                    texto + "\n" + html, sol, texto_visivel=texto
+                )
                 self._salvar_storage(browser_ctx, ctx)
                 self._evento(
                     ctx,
@@ -737,6 +747,11 @@ class FontecredDriver(PlaywrightBankDriver):
         self._levantar_se_recusado(page)
 
     def _passo_veiculo(self, page, sol: SolicitacaoSimulacao) -> None:
+        # O modal da política de crédito pode já estar na tela quando o passo
+        # começa (a consulta do CPF é assíncrona): com ele por cima, o clique na
+        # placa morre no overlay e o veículo em branco sai como erro técnico.
+        # Sonda antes de tocar na placa para virar `credito_recusado`.
+        self._levantar_se_recusado(page)
         # Moto usada (0KM = Não, value "0")
         try:
             page.get_by_label(re.compile(r"Veículo 0KM", re.I)).select_option("0")
@@ -1019,17 +1034,21 @@ class FontecredDriver(PlaywrightBankDriver):
             pass
 
     def _levantar_se_recusado(self, page) -> None:
-        """Se o modal de recusa estiver na tela, sai como negócio recusado.
+        """Se o modal de recusa estiver VISÍVEL, sai como negócio recusado.
 
-        Sonda barata (um get_by_text). Nunca levanta por conta própria:
-        página quebrada não é recusa, e quem chamou tem erro próprio para isso.
+        Sonda barata. Nunca levanta por conta própria: página quebrada não é
+        recusa. E exige visibilidade: o portal mantém o template do modal no DOM
+        com rect 0x0 mesmo sem recusa (sim 4459e2f3), e o `count()` sozinho casava
+        o escondido e recusava um cliente aprovado.
         """
         try:
-            if page.get_by_text(RECUSA_CREDITO).count() > 0:
-                raise RejeicaoNegocio(
-                    "credito_recusado",
-                    "Fontecred recusou: CPF fora da política de crédito",
-                )
+            loc = page.get_by_text(RECUSA_CREDITO)
+            for i in range(loc.count()):
+                if loc.nth(i).is_visible():
+                    raise RejeicaoNegocio(
+                        "credito_recusado",
+                        "Fontecred recusou: CPF fora da política de crédito",
+                    )
         except RejeicaoNegocio:
             raise
         except Exception:
