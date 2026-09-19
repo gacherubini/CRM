@@ -5,19 +5,19 @@ How the engineering skills should consume this repo's domain documentation when 
 ## Before exploring, read these
 
 - **`CONTEXT.md`** at the repo root — the vocabulary (loja, cargo, dono, and so on).
-- **`docs/adr/`** — read ADRs that touch the area you're about to work in.
+- **`docs/referencia-viva/adr/`** — read ADRs that touch the area you're about to work in.
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
 ## File structure
 
 This repo is **single-context**: one `CONTEXT.md` at the root covers the whole
-system, and `docs/adr/` holds the decisions.
+system, and `docs/referencia-viva/adr/` holds the decisions.
 
 ```
 /
 ├── CONTEXT.md
-├── docs/adr/
+├── docs/referencia-viva/adr/
 │   ├── 0001-....md
 │   └── 0002-....md
 └── <um diretório por produto: chatbot-api/, motor-simulacao/, ...>
@@ -35,7 +35,7 @@ already written down somewhere here:
 
 - **`docs/README.md`** — the map of the doc set. Start here when unsure.
 - **`docs/referencia-viva/`** — valid specs, design and as-built descriptions.
-  New ADRs go to `docs/adr/`; the as-built record stays where it is.
+  New ADRs go to `docs/referencia-viva/adr/`; the as-built record stays where it is.
 - **`docs/fila/`** — planned work, one card per task.
 - **`docs/nao-plano/`** — history, brand, tutorials, superseded plans. Not the
   current state of anything. `docs/nao-plano/arquivados/` is explicitly not to

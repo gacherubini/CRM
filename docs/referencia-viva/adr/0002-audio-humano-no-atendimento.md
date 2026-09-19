@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Áudio do vendedor sai pela Cloud API, fica no volume do bundle e só existe em loja Modo 2
