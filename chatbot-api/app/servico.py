@@ -1840,20 +1840,23 @@ def _resposta_saida_humana_duplicada(
     ator: str | None,
 ) -> dict:
     conversa = db.get(Conversa, existente.conversa_id)
-    return {
+    resposta = {
         "duplicada": True,
         "mensagem_id": existente.id,
         "telefone": telefone,
         "texto": existente.texto,
-        "tipo": existente.tipo,
-        "media_ref": existente.media_ref,
-        "duracao_segundos": existente.duracao_segundos,
         "bot_ativo": bool(conversa.bot_ativo) if conversa else False,
         "status": conversa.status if conversa else "handoff",
         "enviado": True,
         "canal_id": existente.canal_id,
         "ator": ator,
     }
+    # Só o áudio acrescenta campos: o contrato do texto fica idêntico ao de antes.
+    if existente.tipo == "audio":
+        resposta["tipo"] = existente.tipo
+        resposta["media_ref"] = existente.media_ref
+        resposta["duracao_segundos"] = existente.duracao_segundos
+    return resposta
 
 
 def enviar_mensagem_humana(

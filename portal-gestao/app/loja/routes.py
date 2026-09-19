@@ -52,6 +52,7 @@ from app.loja.audio_media import (
 from app.loja.human_messaging import (
     HumanMessagingPort,
     MensagemHumanaErro,
+    MensagemHumanaLojaNaoOperacional,
     MensagemHumanaNaoEncontrada,
     MensagemHumanaNaoAutorizada,
 )
@@ -1087,7 +1088,7 @@ async def atendimento_enviar_audio(
     if duracao is not None and duracao > settings.audio_max_duration_seconds:
         return _erro(422, "audio_longo", "Áudio acima do tempo permitido")
 
-    conversa_resumo, _, _ = _conversa_por_telefone(
+    conversa_resumo, conversa_mensagens, _ = _conversa_por_telefone(
         chatbot, telefone, canal_id=canal_id_form
     )
     if conversa_resumo and not canal_permite_envio(
@@ -1095,6 +1096,9 @@ async def atendimento_enviar_audio(
         canal_estado=conversa_resumo.get("canal_estado"),
     ):
         return _erro(423, "canal", "Canal inativo ou desconectado")
+    # ADR-0002: a janela vale no envio, não só na renderização do microfone.
+    if not _janela_atendimento_aberta(conversa_mensagens):
+        return _erro(422, "janela", "Janela de 24h fechada para áudio")
 
     instance_conversa = None
     if conversa_resumo:
@@ -1125,6 +1129,8 @@ async def atendimento_enviar_audio(
         return _erro(404, "conversa", "Conversa não encontrada")
     except MensagemHumanaNaoAutorizada:
         return _erro(403, "perm", "Envio não autorizado")
+    except MensagemHumanaLojaNaoOperacional:
+        return _erro(423, "loja", "Loja não operacional")
     except MensagemHumanaErro as exc:
         return _erro(422, "audio", str(exc) or "Áudio recusado")
     except ChatbotIndisponivel:

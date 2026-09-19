@@ -139,7 +139,7 @@
         <div class="composer-bar">
           <p class="muted composer-hint">
             Sai pelo canal desta conversa{% if workspace.canal_label %} ({{ workspace.canal_label }}){% endif %}.
-            O envio pausa o bot.
+            O envio pausa o bot.{% if not pode_audio %} Só texto por enquanto.{% endif %}
           </p>
           <button class="button primary" type="submit" data-composer-submit>Enviar</button>
         </div>

@@ -41,6 +41,10 @@ class MensagemHumanaNaoEncontrada(MensagemHumanaErro):
     pass
 
 
+class MensagemHumanaLojaNaoOperacional(MensagemHumanaErro):
+    """423 do Chatbot: loja suspensa/não operacional (ADR-0001/0002)."""
+
+
 @dataclass(frozen=True)
 class HumanMessageResult:
     telefone: str
@@ -274,7 +278,7 @@ class HttpHumanMessagingPort:
                 if resposta.status_code in {401, 403}:
                     raise MensagemHumanaNaoAutorizada("envio não autorizado")
                 if resposta.status_code == 423:
-                    raise MensagemHumanaErro("loja não operacional")
+                    raise MensagemHumanaLojaNaoOperacional("loja não operacional")
                 resposta.raise_for_status()
                 dados = resposta.json()
         except MensagemHumanaErro:
@@ -346,7 +350,7 @@ class HttpHumanMessagingPort:
                         _mensagem_de_erro(resposta) or "áudio recusado"
                     )
                 if resposta.status_code == 423:
-                    raise MensagemHumanaErro("loja não operacional")
+                    raise MensagemHumanaLojaNaoOperacional("loja não operacional")
                 resposta.raise_for_status()
                 dados = resposta.json()
         except MensagemHumanaErro:

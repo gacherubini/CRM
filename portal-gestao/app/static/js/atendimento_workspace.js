@@ -342,6 +342,8 @@
     var timer = null;
     var startedAt = 0;
     var audioSending = false;
+    // Chave do áudio atual: retry após falha reusa a mesma, senão duplica.
+    var idemKey = null;
 
     function setStatus(msg, kind) {
       if (!statusEl) return;
@@ -371,6 +373,7 @@
       recorder = null;
       chunks = [];
       blob = null;
+      idemKey = null;
       if (preview) {
         preview.pause();
         preview.removeAttribute("src");
@@ -403,6 +406,7 @@
             blob = new Blob(chunks, {
               type: (recorder && recorder.mimeType) || "audio/webm",
             });
+            idemKey = newIdempotencyKey();
             if (preview) preview.src = URL.createObjectURL(blob);
             show(preview, true);
             show(sendBtn, true);
@@ -465,7 +469,7 @@
       body.append("arquivo", blob, "voz.webm");
       if (csrf) body.append("csrf", csrf.value);
       if (canal) body.append("canal_id", canal.value);
-      body.append("idempotency_key", newIdempotencyKey());
+      body.append("idempotency_key", idemKey || newIdempotencyKey());
       body.append(
         "duracao_segundos",
         String(Math.max(1, Math.round((Date.now() - startedAt) / 1000)))

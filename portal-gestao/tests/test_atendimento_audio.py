@@ -10,7 +10,10 @@ from conftest import csrf_da_resposta, login
 from app.config import settings as portal_settings
 from app.loja import routes as loja_routes
 from app.loja.audio_media import AudioMediaNaoEncontrada, AudioMidia
-from app.loja.human_messaging import InMemoryHumanMessagingPort
+from app.loja.human_messaging import (
+    InMemoryHumanMessagingPort,
+    MensagemHumanaLojaNaoOperacional,
+)
 from app.main import app
 
 TELEFONE = "5511987654321"
@@ -37,16 +40,20 @@ def messaging_fake(atendimento_on):
     app.dependency_overrides.pop(loja_routes.get_human_messaging_port, None)
 
 
-def _tornar_modo2(chatbot_fake):
-    chatbot_fake.conversas[0]["canal_estado"] = "cloud_ativo"
+def _abrir_janela(chatbot_fake):
     chatbot_fake.mensagens[TELEFONE].append(
         {
-            "id": "msg-recente",
+            "id": f"msg-recente-{datetime.now(timezone.utc).timestamp()}",
             "direcao": "entrada",
             "texto": "oi",
             "criada_em": datetime.now(timezone.utc).isoformat(),
         }
     )
+
+
+def _tornar_modo2(chatbot_fake):
+    chatbot_fake.conversas[0]["canal_estado"] = "cloud_ativo"
+    _abrir_janela(chatbot_fake)
 
 
 def _csrf(client):
@@ -64,6 +71,7 @@ def _post_audio(client, csrf, *, key="idem-audio-1", conteudo=b"webmbytes"):
 
 
 def test_envia_audio_multipart(client, chatbot_fake, messaging_fake):
+    _abrir_janela(chatbot_fake)
     login(client, papel="vendedor", email="vendedor@loja.test")
     csrf = _csrf(client)
 
@@ -82,6 +90,7 @@ def test_envia_audio_multipart(client, chatbot_fake, messaging_fake):
 
 
 def test_audio_idempotente(client, chatbot_fake, messaging_fake):
+    _abrir_janela(chatbot_fake)
     login(client)
     csrf = _csrf(client)
 
@@ -118,6 +127,41 @@ def test_audio_fora_de_escopo_403(
 
     assert r.status_code == 403
     assert messaging_fake.enviadas == []
+
+
+def test_audio_fora_da_janela_422(client, chatbot_fake, messaging_fake):
+    # Sem entrada recente: a janela de 24h está fechada.
+    login(client)
+    csrf = _csrf(client)
+
+    r = _post_audio(client, csrf, key="janela-fechada")
+
+    assert r.status_code == 422
+    assert r.json()["error"] == "janela"
+    assert messaging_fake.enviadas == []
+
+
+class _PortaLojaOff:
+    def enviar_texto(self, *args, **kwargs):
+        raise MensagemHumanaLojaNaoOperacional("loja não operacional")
+
+    def enviar_audio(self, *args, **kwargs):
+        raise MensagemHumanaLojaNaoOperacional("loja não operacional")
+
+
+def test_audio_loja_nao_operacional_423(client, chatbot_fake, atendimento_on):
+    _abrir_janela(chatbot_fake)
+    app.dependency_overrides[loja_routes.get_human_messaging_port] = (
+        lambda: _PortaLojaOff()
+    )
+    try:
+        login(client)
+        csrf = _csrf(client)
+        r = _post_audio(client, csrf, key="loja-off")
+    finally:
+        app.dependency_overrides.pop(loja_routes.get_human_messaging_port, None)
+
+    assert r.status_code == 423
 
 
 class _MediaFake:
@@ -284,6 +328,7 @@ def test_flag_de_audio_desligada_esconde_e_bloqueia(
     csrf = _csrf(client)
     html = client.get(f"/app/loja/atendimento/{TELEFONE}").text
     assert "Gravar áudio" not in html
+    assert "Só texto por enquanto." in html
 
     r = client.post(
         f"/app/loja/atendimento/{TELEFONE}/audio",
