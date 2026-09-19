@@ -15,6 +15,7 @@ Cópia de `/tmp/revy_e2e/` na branch `handoff/e2e-18-09`, **sem** `.token*`,
 | `reset.sh` / `reset.sql` | zera loja teste **preservando inbound do vendedor** |
 | `dbq.sh` | SELECT readonly no banco via console app2037 |
 | `provisionar.sh` | cria credencial de loja → `.token` (rodar 1 vez) |
+| `fila-dono.sh` | poe o numero do dono na fila de rodizio, ordem 0 (stdin do `fly ssh console`) |
 | `esperar-webhook.sh` | espera n8n voltar após restart |
 | `audios/` | fixtures (foto + ogg; áudio pausado por ora) |
 

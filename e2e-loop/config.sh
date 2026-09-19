@@ -14,3 +14,5 @@ TOKEN_FILE="$E2E_DIR/.token"
 LOG_DIR="$E2E_DIR/logs/run-$(date +%Y%m%d-%H%M%S)"
 WAIT_SECS=150
 POLL_SECS=10
+# T8: o "Peguei" e o unico passo que so o aparelho do vendedor faz.
+T8_PEGUEI_SECS="${T8_PEGUEI_SECS:-300}"

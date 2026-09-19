@@ -106,6 +106,58 @@ pós-flight reprovou — redeployado com carimbo).
 5. Reverter temporários do loop: allowlist + `dmPolicy disabled` na ponte.
 6. Higiene (não bloqueia): banco do n8n com 365MB de executions; prune.
 
+## Adendo 19/09 — o número do dono vira o vendedor da vez
+
+Decisão do dono: `+5551980336365` (o mesmo aparelho que é o **cliente** do
+loop) entra na `fila_vendedor` da loja teste. Consequências, todas queridas:
+
+- **Ordem 0**, à frente do 1020, que fica intacto. O reset zera o
+  `rodizio_ponteiro`, então a oferta de cada run sai para a ordem 0 — sem isso
+  o dono nunca receberia.
+- **A janela de 24h deixa de ser problema.** `janela_aberta`
+  (`chatbot-api/app/oferta_envio.py:16`) procura inbound daquele número nas
+  últimas 24h; como ele é o cliente, o próprio loop abre a janela. A oferta sai
+  como **interativa**, e o template `chama_vendedor` deixa de bloquear o T8.
+  Criar o template continua valendo para loja real — não para este loop.
+- **Mesmo fio no WhatsApp.** Oferta e conversa de cliente chegam do mesmo
+  número central, então os dois papéis dividem a mesma conversa no aparelho.
+  Só o **clique** no botão vira comando de vendedor
+  (`chatbot-api/app/main.py:786`); texto continua indo para o bot como lead.
+
+### O que mudou no harness
+
+- `cenarios.sh`: T8 ganhou `t8_esperar_peguei` + `t_reset T8-fim`. O reset do
+  fim do cenário é o pedido do dono: **esperar a resposta do vendedor e só
+  então limpar**. Resetar antes apagava a `oferta_lead` no meio do caminho.
+  Timeout em `T8_PEGUEI_SECS` (`config.sh`, 300s), porque o "Peguei" é o único
+  passo que só o aparelho faz.
+- `reset.sql`: a guarda que preservava inbound de vendedor agora **exclui o
+  cliente do loop**. Sem isso, pôr o número dele na fila transformava o reset
+  em no-op justo na conversa que todo cenário zera.
+
+### Falta aplicar em produção
+
+O cadastro na fila não foi aplicado: escrita remota bloqueada na sessão que
+escreveu isto. Comando (roda uma vez, com `fly auth login` da conta Revy) em
+`e2e-loop/fila-dono.py`:
+
+```bash
+fly ssh console -a app2037 < e2e-loop/fila-dono.sh
+```
+
+Pela tela dá no mesmo: Loja → WhatsApp → Fila
+(`portal-gestao/app/web/loja_whatsapp.py:640`), só que a tela exige que a
+projeção de modo vinda do Control diga Modo 2 para o slug `teste`
+(`loja_operacional_projecao`) — essa linha não foi conferida.
+
+Vinculando o vendedor a uma pessoa da equipe da loja (`usuario_id`), o sino 1:1
+do Portal também toca. Sem vínculo, só o WhatsApp — é o caso do 1020 hoje.
+
+### Pendência que morre com isto
+
+A pendência 1 ("mais um `oi` do 1020") só existia para abrir a janela do 1020.
+Com a ordem 0 no dono, o T8 não passa mais pelo 1020.
+
 ## Retomar
 
 ```bash

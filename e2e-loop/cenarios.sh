@@ -156,6 +156,26 @@ print(cands[0]['id'] if cands else '')
     falhou T8-vendedor "oferta aberta mas WhatsApp ao vendedor falhou (template PENDING? janela fechada?)"; return 1
   fi
   assert_contém "$out" "oferta enviada.*envelope=" T8-vendedor "vendedor chamado no WhatsApp" || return 1
+  # O vendedor da vez e o MESMO aparelho do cliente (5551980336365, ordem 0 da
+  # fila): a oferta cai no mesmo fio do WhatsApp. Reset aqui apagaria a oferta
+  # antes do "Peguei" — espera o vendedor responder e so entao limpa.
+  t8_esperar_peguei "$ofid" || return 1
+  t_reset T8-fim || return 1
+}
+
+t8_esperar_peguei() { # $1 = oferta id — verde quando a oferta vira travada
+  local ofid="$1" fim
+  fim=$(( $(date +%s) + T8_PEGUEI_SECS ))
+  e2e_log "T8: toque em Peguei no WhatsApp (espero ate ${T8_PEGUEI_SECS}s)"
+  while [ "$(date +%s)" -lt "$fim" ]; do
+    sleep "$POLL_SECS"
+    if api_ofertas travada 2>/dev/null | grep -q "\"$ofid\""; then
+      passou T8-peguei "vendedor assumiu o lead"
+      return 0
+    fi
+  done
+  falhou T8-peguei "vendedor nao assumiu em ${T8_PEGUEI_SECS}s"
+  return 1
 }
 
 T9_imagem() { # imagem do cliente entra sem OCR e o bot nao fica mudo
