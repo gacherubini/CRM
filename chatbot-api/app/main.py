@@ -13,7 +13,7 @@ from typing import Optional
 from typing import Literal
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
@@ -36,6 +36,11 @@ from app import (  # noqa: F401 (registra os modelos)
     solicitacoes_simulacao,
 )
 from app.audio import AudioProcessor, get_audio_processor, processador_de_audio
+from app.audio_humano import (
+    AudioMediaPort,
+    get_audio_media_port,
+    get_transcription_provider,
+)
 from app.cloud_retry import registrar_evento_falho
 from app.meta_webhook import EventoCloud, assinatura_valida, parse_inbound
 from app.meta_onboarding import NOME_TEMPLATE, OnboardingErro
@@ -1116,6 +1121,106 @@ def enviar_mensagem_humana(
         idempotency_key=dados.idempotency_key,
         instance=dados.instance,
         ator=dados.ator,
+    )
+
+
+def _exigir_audio_humano_habilitado() -> None:
+    """Gate de rollout do Áudio do Vendedor; default OFF (invariante)."""
+    if not config.AUDIO_HUMANO_ENABLED:
+        raise HTTPException(
+            status_code=404, detail="Áudio do Vendedor não habilitado"
+        )
+
+
+@app.post(
+    "/v1/conversas/{telefone}/audios",
+    dependencies=[Depends(_exigir_audio_humano_habilitado)],
+)
+async def enviar_audio_humano(
+    telefone: str,
+    arquivo: UploadFile = File(...),
+    idempotency_key: str = Form(..., min_length=1, max_length=120),
+    instance: Optional[str] = Form(default=None),
+    ator: Optional[str] = Form(default=None, max_length=320),
+    duracao_segundos: Optional[float] = Form(default=None, ge=0),
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+    media: AudioMediaPort = Depends(get_audio_media_port),
+):
+    """Áudio do Vendedor (Portal → Cloud API). Só Modo 2; 422 fora dele.
+
+    Idempotente por ``idempotency_key`` como o texto. O arquivo é convertido e
+    guardado pelo port de mídia; a rota só lê os bytes com teto.
+    """
+    _exigir_loja_operacional(db, ctx.loja_id)
+    limite = config.AUDIO_MAX_BYTES
+    conteudo = await arquivo.read(limite + 1)
+    if len(conteudo) > limite:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "code": "audio_muito_grande",
+                "message": "áudio acima do limite permitido",
+            },
+        )
+    return servico.enviar_audio_humano(
+        db,
+        ctx.loja_id,
+        telefone,
+        conteudo,
+        idempotency_key=idempotency_key,
+        mime=arquivo.content_type,
+        duracao_segundos=duracao_segundos,
+        instance=instance,
+        ator=ator,
+        media=media,
+    )
+
+
+@app.get(
+    "/v1/conversas/{telefone}/mensagens/{mensagem_id}/midia",
+    dependencies=[Depends(_exigir_audio_humano_habilitado)],
+)
+def baixar_midia_humana(
+    telefone: str,
+    mensagem_id: str,
+    request: Request,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+    media: AudioMediaPort = Depends(get_audio_media_port),
+):
+    """Serve o áudio de uma mensagem da própria Loja, com requisição parcial.
+
+    A loja vem do token de serviço; ``telefone`` fica no caminho por simetria com
+    o envio, e o escopo real é a mensagem (id + loja).
+    """
+    status, headers, corpo, mime = servico.baixar_midia_humana(
+        db,
+        ctx.loja_id,
+        mensagem_id,
+        range_header=request.headers.get("range"),
+        media=media,
+    )
+    return Response(
+        content=corpo, status_code=status, headers=headers, media_type=mime
+    )
+
+
+@app.post(
+    "/v1/conversas/{telefone}/mensagens/{mensagem_id}/transcrever",
+    dependencies=[Depends(_exigir_audio_humano_habilitado)],
+)
+def transcrever_midia_humana(
+    telefone: str,
+    mensagem_id: str,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+    media: AudioMediaPort = Depends(get_audio_media_port),
+    provider=Depends(get_transcription_provider),
+):
+    """Transcrição sob demanda do áudio de saída (mesmo Whisper do inbound)."""
+    return servico.transcrever_midia_humana(
+        db, ctx.loja_id, mensagem_id, media=media, provider=provider
     )
 
 
