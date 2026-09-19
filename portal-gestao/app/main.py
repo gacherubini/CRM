@@ -298,6 +298,14 @@ def mascarar_cpf(cpf: str | None) -> str:
     return f"•••.•••.•••-{digitos[-2:]}"
 
 
+def formatar_cpf(cpf: str | None) -> str:
+    """CPF completo no formato 000.000.000-00; devolve '—' se não vier inteiro."""
+    digitos = "".join(c for c in (cpf or "") if c.isdigit())
+    if len(digitos) != 11:
+        return "—"
+    return f"{digitos[:3]}.{digitos[3:6]}.{digitos[6:9]}-{digitos[9:]}"
+
+
 def formatar_brl(valor) -> str:
     try:
         numero = float(valor)
@@ -336,6 +344,7 @@ templates.env.globals["formatar_horario"] = formatar_horario
 templates.env.globals["formatar_data"] = formatar_data
 templates.env.globals["tempo_relativo"] = tempo_relativo
 templates.env.globals["mascarar_cpf"] = mascarar_cpf
+templates.env.globals["formatar_cpf"] = formatar_cpf
 templates.env.globals["formatar_brl"] = formatar_brl
 templates.env.globals["formatar_percentual"] = formatar_percentual
 templates.env.globals["formatar_duracao"] = formatar_duracao

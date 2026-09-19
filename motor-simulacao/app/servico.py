@@ -279,11 +279,29 @@ def listar_simulacoes(
     return itens, total, limite, offset
 
 
+def _cpf_do_payload(sim: SimulacaoORM) -> str | None:
+    """CPF em claro do payload cifrado, para identificar quem foi simulado.
+
+    Decisão do dono (19/09/2026): a listagem mostra o CPF para quem pode
+    simular. Falha de decifragem (chave trocada, payload ausente) vira None —
+    a listagem nunca quebra por causa de um registro antigo. Nunca é logado.
+    """
+    if not sim.payload_cifrado:
+        return None
+    try:
+        dados = json.loads(cripto.decifrar(sim.payload_cifrado))
+    except Exception:
+        return None
+    cpf = dados.get("cpf") if isinstance(dados, dict) else None
+    return cpf or None
+
+
 def simulacao_resumo(sim: SimulacaoORM) -> dict:
     """Projeção não sensível de uma simulação para a listagem/histórico.
 
-    Nunca inclui CPF em claro nem payload cifrado: o CPF fica cifrado em repouso
-    e o índice cego não é reversível para os últimos dígitos, então é omitido.
+    Não inclui o payload cifrado. O CPF sai decifrado porque a Loja o exibe no
+    histórico — inteiro para dono/gerente, mascarado para vendedor — e o RBAC é
+    aplicado lá, não aqui. Nunca é logado.
     """
     return {
         "id": sim.id,
@@ -293,6 +311,7 @@ def simulacao_resumo(sim: SimulacaoORM) -> dict:
         "solicitado_por": sim.solicitado_por,
         "referencia_externa": sim.referencia_externa,
         "placa": sim.placa,
+        "cpf": _cpf_do_payload(sim),
         "categoria": sim.categoria,
         "provedores": sim.provedores or [],
         "prazos_meses": sim.prazos_meses or (

@@ -1,14 +1,17 @@
 """GET /v1/simulacoes — histórico por cliente/ator (Task 16).
 
 Listagem escopada por cliente (tenancy), com filtros (status, solicitado_por,
-desde/ate) e paginação. Nunca decifra payload pessoal; expõe só campos não
-sensíveis (placa, referencia_externa, provedores, prazos).
+desde/ate) e paginação. Decifra só o CPF do payload pessoal (decisão de
+19/09/2026) e mantém o resto fora da resposta (placa, referencia_externa,
+provedores, prazos, status).
 """
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
 
+from app import cripto
 from app.auth import hash_token
 from app.main import app
 from app.models_db import ClienteApiORM, CredencialApiORM, SimulacaoORM
@@ -36,7 +39,9 @@ def _cliente(db, nome, token):
     return TestClient(app, headers={"Authorization": f"Bearer {token}"}), cliente_id
 
 
-def _semear(db, cliente_id, *, n=1, status="recebida", solicitado_por=None, base=None):
+def _semear(
+    db, cliente_id, *, n=1, status="recebida", solicitado_por=None, base=None, cpf=None
+):
     base = base or datetime(2026, 7, 1, tzinfo=timezone.utc)
     ids = []
     for i in range(n):
@@ -46,6 +51,7 @@ def _semear(db, cliente_id, *, n=1, status="recebida", solicitado_por=None, base
             status=status,
             solicitado_por=solicitado_por,
             criada_em=base + timedelta(minutes=i),
+            payload_cifrado=cripto.cifrar(json.dumps({"cpf": cpf})) if cpf else None,
             placa="ABC1D23",
             provedores=["mock"],
             prazos_meses=[48],
@@ -97,13 +103,21 @@ def test_listagem_escopada_por_cliente(db):
     assert cliente_b.get("/v1/simulacoes").json()["total"] == 3
 
 
-def test_listagem_nunca_expoe_cpf_em_claro(db):
+def test_listagem_expoe_cpf_e_nao_o_payload(db):
     cliente_a, id_a = _cliente(db, "Cliente A", "tok-a")
-    _semear(db, id_a, n=1)
+    _semear(db, id_a, n=1, cpf="529.982.247-25")
     item = cliente_a.get("/v1/simulacoes").json()["itens"][0]
-    assert "cpf" not in item
+    # Decisão de 19/09/2026: o CPF identifica quem foi simulado na listagem.
+    assert item["cpf"] == "529.982.247-25"
     assert "payload_cifrado" not in item
     assert item["placa"] == "ABC1D23"
+
+
+def test_listagem_sem_payload_nao_quebra(db):
+    cliente_a, id_a = _cliente(db, "Cliente A", "tok-a")
+    _semear(db, id_a, n=1)  # registro antigo, sem payload cifrado
+    item = cliente_a.get("/v1/simulacoes").json()["itens"][0]
+    assert item["cpf"] is None
 
 
 # --- filtros ---

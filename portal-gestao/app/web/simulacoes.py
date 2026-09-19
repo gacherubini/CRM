@@ -439,6 +439,14 @@ def _formatar_cpf(cpf: str) -> str:
     return f"{digitos[:3]}.{digitos[3:6]}.{digitos[6:9]}-{digitos[9:]}"
 
 
+def _cpf_para_exibicao(cpf: str | None, ver_inteiro: bool) -> str | None:
+    """CPF para a coluna do histórico: inteiro p/ dono/gerente, mascarado p/
+    vendedor. Vazio vira None (o template mostra "—")."""
+    if not cpf:
+        return None
+    return _formatar_cpf(cpf) if ver_inteiro else mascarar_cpf(cpf)
+
+
 # Estados do job no Motor (worker Playwright).
 _SIM_STATUS_TERMINAIS = frozenset(
     {"concluida", "parcial", "falhou", "aguardando_intervencao", "cancelada"}
@@ -779,8 +787,13 @@ def simulacoes_historico(
             limite=limite,
             offset=offset,
         )
-        itens = dados.get("itens") or []
+        itens = [dict(item) for item in (dados.get("itens") or [])]
         total = dados.get("total") or 0
+        # Dono/gerente veem o CPF inteiro; vendedor, mascarado (mesmo gate de
+        # pode_ver_custo usado no resultado).
+        ver_cpf_inteiro = pode_ver_custo(usuario)
+        for item in itens:
+            item["cpf_exibicao"] = _cpf_para_exibicao(item.get("cpf"), ver_cpf_inteiro)
     except MotorIndisponivel as exc:
         erro = str(exc)
 

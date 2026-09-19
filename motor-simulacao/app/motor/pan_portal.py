@@ -317,10 +317,21 @@ class PanPortalDriver(PlaywrightBankDriver):
                     ctx,
                     "agente_definido",
                     "Agente certificado e operador confirmados no portal.",
+                    page,
+                    True,
                 )
                 self._passo_cliente(page, sol)
+                self._evento(
+                    ctx, "cliente_preenchido", "Dados do cliente preenchidos.", page, True
+                )
                 self._passo_veiculo(page, sol)
+                self._evento(
+                    ctx, "veiculo_preenchido", "Dados do veiculo preenchidos.", page, True
+                )
                 self._passo_valor(page, sol)
+                self._evento(
+                    ctx, "valor_preenchido", "Valor do veiculo preenchido.", page, True
+                )
                 self._evento(
                     ctx,
                     "dados_preenchidos",
@@ -347,11 +358,15 @@ class PanPortalDriver(PlaywrightBankDriver):
                     nivel="sucesso",
                 )
                 return resultados
-            except (RejeicaoNegocio, IntervencaoNecessaria, ErroTransitorio):
+            except (RejeicaoNegocio, IntervencaoNecessaria, ErroTransitorio) as exc:
+                # O detalhe da excecao (qual campo, qual modal) tem de chegar na
+                # timeline: `codigo_erro` sozinho nao diz onde o portal travou.
+                codigo = getattr(exc, "codigo", "") or type(exc).__name__
+                detalhe = " ".join(str(getattr(exc, "mensagem", "") or exc).split())
                 self._evento(
                     ctx,
                     "falha_portal",
-                    "O fluxo bancario foi interrompido; consulte o codigo do resultado.",
+                    f"Fluxo interrompido: {codigo} - {detalhe}",
                     page,
                     True,
                     "erro",

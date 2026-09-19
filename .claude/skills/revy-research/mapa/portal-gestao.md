@@ -1,6 +1,6 @@
 # portal-gestao · 184 rotas · 26 modelos · 6 workers · 38 flags · 27 migrations · 63 templates
 
-Gerado de `7bc2b27`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `fc90e7c`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0027_perfil_avatar_foto`
 
 ## Rotas
@@ -20,44 +20,44 @@ Migration head: `0027_perfil_avatar_foto`
 - `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1562
 - `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1605
 - `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1627
-- `GET /health/live` — app/main.py:583
-- `GET /health/ready` — app/main.py:588
-- `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:597
-- `GET /` — app/main.py:632
-- `GET /login` — app/main.py:637
-- `POST /login` — app/main.py:644
-- `POST /logout` — app/main.py:665
-- `GET /conta/senha` — app/main.py:672
-- `POST /conta/senha` — app/main.py:681
-- `GET /app` — app/main.py:718
-- `GET /app/estoque` — app/main.py:847
-- `GET /app/estoque/novo` — app/main.py:886
-- `GET /app/operacao/numeros` — app/main.py:986
-- `POST /app/operacao/grupo` — app/main.py:1019
-- `POST /app/operacao/numeros` — app/main.py:1047
-- `POST /app/operacao/numeros/remover` — app/main.py:1074
-- `POST /app/estoque/novo` — app/main.py:1100
-- `GET /app/estoque/{veiculo_id}` — app/main.py:1127
-- `POST /app/estoque/{veiculo_id}` — app/main.py:1158
-- `POST /app/estoque/{veiculo_id}/{acao}` — app/main.py:1186
-- `GET /app/leads` — app/main.py:1233
-- `GET /app/leads/{lead_id}` — app/main.py:1261
-- `POST /app/leads/{lead_id}/etapa` — app/main.py:1297
-- `GET /app/conversas` — app/main.py:1356
-- `GET /app/conversas/{telefone}` — app/main.py:1383
-- `POST /app/conversas/{telefone}/handoff` — app/main.py:1476
-- `GET /app/vendas` — app/main.py:1589
-- `GET /app/vendas/nova` — app/main.py:1629
-- `POST /app/vendas/nova` — app/main.py:1646
-- `POST /app/vendas/{venda_id}/confirmar` — app/main.py:2049
-- `POST /app/vendas/{venda_id}/cancelar` — app/main.py:2067
-- `GET /app/vendedor` — app/main.py:2079
-- `GET /app/funil` — app/main.py:2190
-- `GET /app/funil/dados` — app/main.py:2266
-- `GET /app/financeiro` — app/main.py:2303
-- `GET /app/financeiras` — app/main.py:2380
-- `POST /app/financeiras/{nome}` — app/main.py:2444
-- `GET /app/configuracoes` — app/main.py:2566
+- `GET /health/live` — app/main.py:592
+- `GET /health/ready` — app/main.py:597
+- `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:606
+- `GET /` — app/main.py:641
+- `GET /login` — app/main.py:646
+- `POST /login` — app/main.py:653
+- `POST /logout` — app/main.py:674
+- `GET /conta/senha` — app/main.py:681
+- `POST /conta/senha` — app/main.py:690
+- `GET /app` — app/main.py:727
+- `GET /app/estoque` — app/main.py:856
+- `GET /app/estoque/novo` — app/main.py:895
+- `GET /app/operacao/numeros` — app/main.py:995
+- `POST /app/operacao/grupo` — app/main.py:1028
+- `POST /app/operacao/numeros` — app/main.py:1056
+- `POST /app/operacao/numeros/remover` — app/main.py:1083
+- `POST /app/estoque/novo` — app/main.py:1109
+- `GET /app/estoque/{veiculo_id}` — app/main.py:1136
+- `POST /app/estoque/{veiculo_id}` — app/main.py:1167
+- `POST /app/estoque/{veiculo_id}/{acao}` — app/main.py:1195
+- `GET /app/leads` — app/main.py:1242
+- `GET /app/leads/{lead_id}` — app/main.py:1270
+- `POST /app/leads/{lead_id}/etapa` — app/main.py:1306
+- `GET /app/conversas` — app/main.py:1365
+- `GET /app/conversas/{telefone}` — app/main.py:1392
+- `POST /app/conversas/{telefone}/handoff` — app/main.py:1485
+- `GET /app/vendas` — app/main.py:1598
+- `GET /app/vendas/nova` — app/main.py:1638
+- `POST /app/vendas/nova` — app/main.py:1655
+- `POST /app/vendas/{venda_id}/confirmar` — app/main.py:2058
+- `POST /app/vendas/{venda_id}/cancelar` — app/main.py:2076
+- `GET /app/vendedor` — app/main.py:2088
+- `GET /app/funil` — app/main.py:2199
+- `GET /app/funil/dados` — app/main.py:2275
+- `GET /app/financeiro` — app/main.py:2312
+- `GET /app/financeiras` — app/main.py:2389
+- `POST /app/financeiras/{nome}` — app/main.py:2453
+- `GET /app/configuracoes` — app/main.py:2575
 - `GET /app/relatorios` — app/relatorios.py:66
 - `GET /app/relatorios/vendas.csv` — app/relatorios.py:112
 - `GET /app/relatorios/metas.csv` — app/relatorios.py:157
@@ -147,10 +147,10 @@ Migration head: `0027_perfil_avatar_foto`
 - `POST /senha/redefinir` — app/web/password_reset.py:100
 - `GET /app/simulacoes` — app/web/simulacoes.py:316
 - `POST /app/simulacoes` — app/web/simulacoes.py:346
-- `GET /app/simulacoes/job/{sim_id}` — app/web/simulacoes.py:623
-- `GET /app/simulacoes/historico` — app/web/simulacoes.py:742
-- `GET /app/simulacoes/{sim_id}/registros` — app/web/simulacoes.py:898
-- `GET /app/simulacoes/{sim_id}/registros/{evento_id}/print` — app/web/simulacoes.py:935
+- `GET /app/simulacoes/job/{sim_id}` — app/web/simulacoes.py:631
+- `GET /app/simulacoes/historico` — app/web/simulacoes.py:750
+- `GET /app/simulacoes/{sim_id}/registros` — app/web/simulacoes.py:911
+- `GET /app/simulacoes/{sim_id}/registros/{evento_id}/print` — app/web/simulacoes.py:948
 - `GET /app/campanhas` — app/web/trafego.py:116
 - `GET /app/campanhas/nova` — app/web/trafego.py:177
 - `POST /app/campanhas/nova` — app/web/trafego.py:195
@@ -306,22 +306,22 @@ Migration head: `0027_perfil_avatar_foto`
 - `app/templates/loja/agente.html` — app/loja/routes.py:444
 - `app/templates/loja/atendimento_workspace.html` — app/loja/routes.py:566
 - `app/templates/loja/agente_configuracao.html` — app/loja/routes.py:1509
-- `app/templates/login.html` — app/main.py:641
-- `app/templates/dashboard.html` — app/main.py:828
-- `app/templates/estoque/lista.html` — app/main.py:872
-- `app/templates/estoque/form.html` — app/main.py:897
-- `app/templates/operacao/numeros.html` — app/main.py:1008
-- `app/templates/leads/lista.html` — app/main.py:1250
-- `app/templates/leads/detalhe.html` — app/main.py:1285
-- `app/templates/conversas/lista.html` — app/main.py:1372
-- `app/templates/conversas/detalhe.html` — app/main.py:1408
-- `app/templates/vendas/form.html` — app/main.py:1571
-- `app/templates/vendas/lista.html` — app/main.py:1615
-- `app/templates/vendedor/dashboard.html` — app/main.py:2174
-- `app/templates/funil/index.html` — app/main.py:2253
-- `app/templates/financeiro/dashboard.html` — app/main.py:2359
-- `app/templates/financeiras/lista.html` — app/main.py:2430
-- `app/templates/configuracoes/index.html` — app/main.py:2606
+- `app/templates/login.html` — app/main.py:650
+- `app/templates/dashboard.html` — app/main.py:837
+- `app/templates/estoque/lista.html` — app/main.py:881
+- `app/templates/estoque/form.html` — app/main.py:906
+- `app/templates/operacao/numeros.html` — app/main.py:1017
+- `app/templates/leads/lista.html` — app/main.py:1259
+- `app/templates/leads/detalhe.html` — app/main.py:1294
+- `app/templates/conversas/lista.html` — app/main.py:1381
+- `app/templates/conversas/detalhe.html` — app/main.py:1417
+- `app/templates/vendas/form.html` — app/main.py:1580
+- `app/templates/vendas/lista.html` — app/main.py:1624
+- `app/templates/vendedor/dashboard.html` — app/main.py:2183
+- `app/templates/funil/index.html` — app/main.py:2262
+- `app/templates/financeiro/dashboard.html` — app/main.py:2368
+- `app/templates/financeiras/lista.html` — app/main.py:2439
+- `app/templates/configuracoes/index.html` — app/main.py:2615
 - `app/templates/relatorios/index.html` — app/relatorios.py:99
 - `app/templates/base.html` — app/templates/base.html
 - `app/templates/conta_senha.html` — app/templates/conta_senha.html
@@ -352,10 +352,10 @@ Migration head: `0027_perfil_avatar_foto`
 - `app/templates/senha_esqueci.html` — app/web/password_reset.py:33
 - `app/templates/senha_redefinir.html` — app/web/password_reset.py:95
 - `app/templates/simulacoes/form.html` — app/web/simulacoes.py:335
-- `app/templates/simulacoes/resultado.html` — app/web/simulacoes.py:700
-- `app/templates/simulacoes/progresso.html` — app/web/simulacoes.py:721
-- `app/templates/simulacoes/historico.html` — app/web/simulacoes.py:788
-- `app/templates/simulacoes/registros.html` — app/web/simulacoes.py:919
+- `app/templates/simulacoes/resultado.html` — app/web/simulacoes.py:708
+- `app/templates/simulacoes/progresso.html` — app/web/simulacoes.py:729
+- `app/templates/simulacoes/historico.html` — app/web/simulacoes.py:801
+- `app/templates/simulacoes/registros.html` — app/web/simulacoes.py:932
 - `app/templates/campanhas/lista.html` — app/web/trafego.py:150
 - `app/templates/campanhas/form.html` — app/web/trafego.py:185
 - `app/templates/campanhas/gastos_lote.html` — app/web/trafego.py:274

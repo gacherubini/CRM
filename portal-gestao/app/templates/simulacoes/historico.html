@@ -30,12 +30,12 @@
 <section class="panel flush">
   {% if itens %}
   <div class="table-wrap"><table>
-    <thead><tr><th>Data/hora</th><th>Status</th><th>Placa / referência</th><th>Prazos</th><th>Bancos</th>{% if escopo == 'loja' %}<th>Solicitante</th>{% endif %}<th><span class="sr-only">Ações</span></th></tr></thead>
+    <thead><tr><th>Data/hora</th><th>Status</th><th>Placa / referência</th><th>CPF</th><th>Bancos</th>{% if escopo == 'loja' %}<th>Solicitante</th>{% endif %}<th><span class="sr-only">Ações</span></th></tr></thead>
     <tbody>{% for s in itens %}<tr>
       <td>{{ formatar_horario(s.criada_em) }}</td>
       <td><span class="status {{ s.status }}">{{ status_labels.get(s.status, s.status | replace('_', ' ')) }}</span></td>
       <td>{% if s.placa %}<strong>{{ s.placa }}</strong>{% elif s.referencia_externa %}{{ s.referencia_externa }}{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td>{% if s.prazos_meses %}{{ s.prazos_meses | join(', ') }}x{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if s.cpf_exibicao %}<span class="dado-tecnico">{{ s.cpf_exibicao }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>{% if s.provedores %}{{ s.provedores | join(', ') }}{% else %}<span class="muted">—</span>{% endif %}</td>
       {% if escopo == 'loja' %}<td>{% if s.solicitado_por %}{{ s.solicitado_por }}{% else %}<span class="muted">—</span>{% endif %}</td>{% endif %}
       <td><div class="row-actions"><a class="button secondary" href="/app/simulacoes/job/{{ s.id }}">Ver parcelas</a><a class="button secondary" href="/app/simulacoes/{{ s.id }}/registros">Registros e prints</a></div></td>

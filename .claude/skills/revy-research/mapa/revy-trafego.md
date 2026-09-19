@@ -1,6 +1,6 @@
 # revy-trafego · 121 rotas · 32 modelos · 6 workers · 60 flags · 21 migrations · 20 templates
 
-Gerado de `7bc2b27`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `fc90e7c`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0021_motor_tokens_cofre`
 
 ## Rotas

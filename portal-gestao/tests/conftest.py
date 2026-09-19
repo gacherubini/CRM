@@ -564,7 +564,7 @@ class MotorFake:
                 ],
             },
         ]
-        # Histórico de simulações (projeção não sensível do Motor — sem CPF/valores).
+        # Histórico de simulações (projeção do Motor — traz o CPF, sem valores).
         self.listagens = []
         self.historico = [
             {
@@ -572,6 +572,7 @@ class MotorFake:
                 "criada_em": "2026-07-13T10:00:00+00:00",
                 "atualizada_em": "2026-07-13T10:02:00+00:00",
                 "solicitado_por": "dono@loja.test", "referencia_externa": None,
+                "cpf": "52998224725",
                 "placa": "ABC1D23", "categoria": "moto",
                 "provedores": ["Santander"], "prazos_meses": [24, 48],
                 "num_resultados": 2,
@@ -581,6 +582,7 @@ class MotorFake:
                 "criada_em": "2026-07-12T09:00:00+00:00",
                 "atualizada_em": "2026-07-12T09:01:00+00:00",
                 "solicitado_por": "dono@loja.test", "referencia_externa": "lead-9",
+                "cpf": None,
                 "placa": None, "categoria": "carro",
                 "provedores": ["Pan"], "prazos_meses": [36],
                 "num_resultados": 1,
@@ -590,9 +592,20 @@ class MotorFake:
                 "criada_em": "2026-07-11T08:00:00+00:00",
                 "atualizada_em": "2026-07-11T08:03:00+00:00",
                 "solicitado_por": "outro@loja.test", "referencia_externa": None,
+                "cpf": "39053344705",
                 "placa": "ZZZ9Z99", "categoria": "moto",
                 "provedores": ["Santander"], "prazos_meses": [48],
                 "num_resultados": 2,
+            },
+            {
+                "id": "sim-vend-1", "status": "concluida",
+                "criada_em": "2026-07-10T08:00:00+00:00",
+                "atualizada_em": "2026-07-10T08:03:00+00:00",
+                "solicitado_por": "vend@loja.test", "referencia_externa": None,
+                "cpf": "11144477735",
+                "placa": "VND1A23", "categoria": "moto",
+                "provedores": ["Santander"], "prazos_meses": [36],
+                "num_resultados": 1,
             },
         ]
 

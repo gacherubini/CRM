@@ -2289,6 +2289,12 @@ tr.roi-sem-campanha td { color: var(--ink-soft); }
 }
 .sim-print-frame img { display: block; width: 100%; height: auto; }
 
+/* "Minimizar bancos" em Registros e prints: recolhidos, cada banco fica só com
+   o cabeçalho, enfileirados (Santander, Fontecred, ...). A classe mora no
+   #sim-registros para sobreviver ao auto-refresh, que só troca as seções. */
+#sim-registros.sim-bancos-colapsados .sim-steps,
+#sim-registros.sim-bancos-colapsados .sim-print { display: none; }
+
 /* ===========================================================================
    === Tabela e lista ===
    =========================================================================== */

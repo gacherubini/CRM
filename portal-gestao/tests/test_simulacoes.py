@@ -263,6 +263,18 @@ def test_registros_mostram_timeline_e_link_de_print_para_dono(
     assert "Ver parcelas" in resposta.text
 
 
+def test_registros_tem_botao_minimizar_bancos(client, chatbot_fake, motor_fake):
+    login(client, papel="dono")
+    resposta = client.get("/app/simulacoes/sim-motor-1/registros")
+    assert resposta.status_code == 200
+    # Botão fica no cabeçalho (fora do #sim-registros), então o auto-refresh
+    # não o recria. A classe de colapso vai no próprio #sim-registros.
+    assert 'id="sim-bancos-toggle"' in resposta.text
+    assert "Minimizar bancos" in resposta.text
+    assert 'data-provedor="santander"' in resposta.text
+    assert 'data-provedor="bradesco"' in resposta.text
+
+
 def test_registros_de_job_encerrado_nao_se_atualizam(client, chatbot_fake, motor_fake):
     motor_fake.status_retorno = "concluida"
     login(client, papel="dono")

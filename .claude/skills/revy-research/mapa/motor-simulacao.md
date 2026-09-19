@@ -1,6 +1,6 @@
 # motor-simulacao · 17 rotas · 12 modelos · 1 workers · 2 flags · 14 migrations
 
-Gerado de `7bc2b27`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `fc90e7c`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0014`
 
 ## Rotas
@@ -18,10 +18,10 @@ Migration head: `0014`
 - `POST /v1/internal/provisioning/state` — app/main.py:241
 - `POST /v1/simulacoes` — app/main.py:263
 - `GET /v1/simulacoes` — app/main.py:297
-- `GET /v1/simulacoes/{sim_id}` — app/main.py:336
-- `GET /v1/simulacoes/{sim_id}/eventos` — app/main.py:353
-- `GET /v1/simulacoes/{sim_id}/eventos/{evento_id}/print` — app/main.py:374
-- `POST /v1/simulacoes/{sim_id}/cancelar` — app/main.py:427
+- `GET /v1/simulacoes/{sim_id}` — app/main.py:338
+- `GET /v1/simulacoes/{sim_id}/eventos` — app/main.py:355
+- `GET /v1/simulacoes/{sim_id}/eventos/{evento_id}/print` — app/main.py:376
+- `POST /v1/simulacoes/{sim_id}/cancelar` — app/main.py:429
 
 ## Modelos
 

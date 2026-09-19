@@ -8,7 +8,10 @@
     <h1>Registros da simulação</h1>
     <p>Job <code class="mono-inline">{{ sim_id }}</code> · <span class="status {{ status }}" id="sim-registros-status">{{ status_label }}</span>{% if auto_refresh %} <span class="muted" id="sim-registros-aovivo">· atualizando sozinha</span>{% endif %}</p>
   </div>
-  <a class="button secondary" href="/app/simulacoes/job/{{ sim_id }}">Ver parcelas</a>
+  <div class="heading-actions">
+    {% if grupos_eventos %}<button class="button secondary" type="button" id="sim-bancos-toggle" aria-expanded="true" aria-controls="sim-registros">Minimizar bancos</button>{% endif %}
+    <a class="button secondary" href="/app/simulacoes/job/{{ sim_id }}">Ver parcelas</a>
+  </div>
 </div>
 
 {% if erro %}<div class="alert error">{{ erro }}</div>{% endif %}
@@ -85,6 +88,31 @@
 </section>
 {% endif %}
 </div>
+
+<script>
+  // Recolhe/expande todos os blocos de banco de uma vez. Recolhido, a tela
+  // mostra os bancos enfileirados (Santander, Fontecred, ...) só com o
+  // cabeçalho. A classe mora no #sim-registros — elemento que o auto-refresh
+  // nunca substitui — para o estado sobreviver ao poll.
+  (function () {
+    var botao = document.getElementById("sim-bancos-toggle");
+    var raiz = document.getElementById("sim-registros");
+    if (!botao || !raiz) return;
+    var COLAPSADO = "sim-bancos-colapsados";
+
+    function aplicar() {
+      var colapsado = raiz.classList.contains(COLAPSADO);
+      botao.textContent = colapsado ? "Expandir bancos" : "Minimizar bancos";
+      botao.setAttribute("aria-expanded", colapsado ? "false" : "true");
+    }
+
+    botao.addEventListener("click", function () {
+      raiz.classList.toggle(COLAPSADO);
+      aplicar();
+    });
+    aplicar();
+  })();
+</script>
 
 <div class="alert warning">Os prints podem conter dados pessoais da tela bancária. Não compartilhe nem deixe armazenados além do necessário para diagnóstico.</div>
 {% if auto_refresh %}

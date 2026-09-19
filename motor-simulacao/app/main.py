@@ -308,8 +308,10 @@ def listar_simulacoes(
 ):
     """Histórico de simulações do cliente (tenancy). Filtros e paginação.
 
-    Nunca decifra o payload pessoal — devolve só a projeção não sensível
-    (placa, referência, provedores, prazos, status).
+    Devolve a projeção da listagem (placa, referência, provedores, prazos,
+    status) e o CPF de quem foi simulado, decifrado sob demanda — decisão de
+    19/09/2026. O restante do payload pessoal (nascimento, renda, telefone)
+    continua fora da resposta.
     """
     if isinstance(cliente, JSONResponse):
         return cliente

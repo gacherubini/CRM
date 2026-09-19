@@ -39,6 +39,25 @@ def test_historico_separa_parcelas_de_registros(client, motor_fake):
     assert "/app/simulacoes/sim-dono-1/registros" in resposta.text
 
 
+def test_historico_mostra_cpf_no_lugar_dos_prazos(client, motor_fake):
+    login(client, papel="dono")
+    resposta = client.get("/app/simulacoes/historico")
+    assert resposta.status_code == 200
+    assert "<th>CPF</th>" in resposta.text
+    assert "529.982.247-25" in resposta.text
+    # Prazos saiu do grid.
+    assert "<th>Prazos</th>" not in resposta.text
+
+
+def test_historico_vendedor_ve_cpf_mascarado(client, motor_fake):
+    login(client, papel="vendedor", email="vend@loja.test")
+    resposta = client.get("/app/simulacoes/historico")
+    assert resposta.status_code == 200
+    # Vendedor nunca recebe o CPF inteiro no HTML; só os dois últimos dígitos.
+    assert "111.444.777-35" not in resposta.text
+    assert "•••.•••.•••-35" in resposta.text
+
+
 def test_historico_vendedor_escopo_forcado_para_minhas(client, motor_fake):
     login(client, papel="vendedor", email="vend@loja.test")
     # Mesmo pedindo escopo=loja, vendedor só vê as próprias.
