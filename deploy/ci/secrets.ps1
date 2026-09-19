@@ -27,13 +27,26 @@ param(
   [Parameter(Position = 1)]
   [string]$Nome,
 
-  [string]$Repo = 'gacherubini/CRM'
+  [string]$Repo = 'gacherubini/CRM',
+
+  # Caminho do .env.local. So precisa passar quando o script roda de um
+  # worktree e o arquivo esta na arvore principal (ele fica fora do git).
+  [string]$EnvLocal
 )
 
 $ErrorActionPreference = 'Stop'
 
-$Raiz = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$EnvLocal = Join-Path $Raiz 'motor-simulacao\.env.local'
+# UTF-8 SEM BOM ao canalizar para executavel nativo. O default do PowerShell 5.1
+# prefixa U+FEFF em cada write do pipe, e o `gh` grava isso dentro do valor: uma
+# senha de portal chega ao CI com um caractere invisivel na frente e o login
+# falha sem dizer por que. Conferido em 19/09/2026 com `gh variable list`.
+$OutputEncoding = New-Object System.Text.UTF8Encoding $false
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
+
+if (-not $EnvLocal) {
+  $Raiz = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+  $EnvLocal = Join-Path $Raiz 'motor-simulacao\.env.local'
+}
 
 # Nao sao segredo: sao os parametros da simulacao de teste. Ficam em
 # `gh variable` para voce conseguir ler e ajustar sem adivinhar o valor atual.
@@ -89,15 +102,31 @@ function GravarEnvLocal([string]$n, [string]$valor) {
 }
 
 function EnviarAoGitHub([string]$n, [string]$valor) {
-  # Pelo stdin, nunca por argumento: argumento aparece na lista de processos.
-  if (EhVariavel $n) {
-    $valor | gh variable set $n --repo $Repo
-    if (-not $?) { throw "falhou ao gravar a variable $n" }
+  # Arquivo temporario sem BOM, lido pelo stdin do gh via `cmd`. Os outros dois
+  # caminhos obvios nao servem, e os dois foram medidos em 19/09/2026:
+  #
+  #   `$valor | gh ...`      o pipe do PowerShell 5.1 prefixa U+FEFF no valor,
+  #                          mesmo com $OutputEncoding ajustado. Uma senha de
+  #                          portal chega ao CI com um caractere invisivel na
+  #                          frente e o login falha sem dizer por que.
+  #   `gh ... --body $valor` limpo, mas poe a senha na linha de comando, onde
+  #                          qualquer processo da maquina consegue ler.
+  #
+  # O PowerShell 5.1 nao tem redirecionamento `<`, dai o `cmd /c`.
+  $tipo = if (EhVariavel $n) { 'variable' } else { 'secret' }
+  $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ([System.IO.Path]::GetRandomFileName())
+  try {
+    [System.IO.File]::WriteAllText($tmp, $valor, (New-Object System.Text.UTF8Encoding $false))
+    cmd /c "gh $tipo set $n --repo $Repo < ""$tmp"""
+    if ($LASTEXITCODE -ne 0) { throw "falhou ao gravar o $tipo $n" }
+  }
+  finally {
+    if (Test-Path $tmp) { Remove-Item $tmp -Force }
+  }
+  if ($tipo -eq 'variable') {
     Write-Host "  GitHub variable $n  (visivel na UI)" -ForegroundColor DarkGray
   }
   else {
-    $valor | gh secret set $n --repo $Repo
-    if (-not $?) { throw "falhou ao gravar o secret $n" }
     Write-Host "  GitHub secret   $n  (escrita so)" -ForegroundColor DarkGray
   }
 }

@@ -159,6 +159,21 @@ Outros comandos:
 | `secrets.ps1 list` | lista o que existe no GitHub **e quando cada um mudou** — é o que responde "essa senha é de quando?" |
 | `secrets.ps1 check` | compara os nomes dos dois lados e diz o que falta onde |
 
+Rodando de um worktree, o `.env.local` está na árvore principal. Aponte:
+
+```powershell
+.\deploy\ci\secrets.ps1 push -EnvLocal C:\caminho\da\arvore\motor-simulacao\.env.local
+```
+
+```bash
+ENV_LOCAL=/caminho/da/arvore/motor-simulacao/.env.local ./deploy/ci/secrets.sh push
+```
+
+> O script grava por arquivo temporário e `cmd /c`, não por pipe. Medido em
+> 19/09/2026: `$valor | gh secret set` no PowerShell 5.1 prefixa um U+FEFF
+> invisível no valor, e `--body` põe a senha na linha de comando. Os dois
+> caminhos óbvios estão errados; não "simplifique" para eles.
+
 ### Adicionar um banco novo
 
 Não precisa editar YAML. O workflow monta o `.env.local` a partir de tudo que

@@ -13,7 +13,9 @@ set -euo pipefail
 
 REPO="${REPO:-gacherubini/CRM}"
 RAIZ="$(cd "$(dirname "$0")/../.." && pwd)"
-ENV_LOCAL="$RAIZ/motor-simulacao/.env.local"
+# ENV_LOCAL=... na frente do comando aponta para outra arvore. So precisa disso
+# rodando de um worktree, ja que o .env.local fica fora do git.
+ENV_LOCAL="${ENV_LOCAL:-$RAIZ/motor-simulacao/.env.local}"
 
 # Nao sao segredo: sao os parametros da simulacao de teste. Vao para
 # `gh variable`, que da para ler e editar na interface do GitHub.
