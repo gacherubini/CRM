@@ -17,6 +17,26 @@ independentes; um falhar não segura o outro.
 
 ---
 
+### Sobre a varredura de segredo
+
+O `gitleaks` roda **só em `pull_request`**, onde ele varre os commits do PR. É o
+ponto do job: impedir que um segredo *entre*. Em `workflow_dispatch` ele varreria
+o histórico inteiro e devolveria ruído. A checagem por nome de arquivo proibido
+(`AGENTS.md` §5) roda sempre, nos dois eventos.
+
+O histórico foi varrido na mão em 19/09/2026: **77 achados, todos falso
+positivo**. 60 são UUID de nó e texto de descrição nos `n8n/workflow-*.json` —
+lá os segredos são marcadores `__ALGO__`, e o `.ready.json` com valor real é
+gitignored. 8 são exemplos de `curl -H Authorization` em README e plano. O resto
+é identificador longo, sendo um deles um literal `return {"status": "ok"}`.
+Nenhum arquivo `.env` jamais foi rastreado.
+
+Para refazer essa varredura:
+
+```bash
+gitleaks detect --source . --report-path /tmp/leaks.json
+```
+
 ## 1. Ligar o portão de merge
 
 Os workflows sozinhos só pintam um ✗. O que trava o botão de merge é branch

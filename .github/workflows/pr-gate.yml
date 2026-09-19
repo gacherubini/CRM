@@ -222,13 +222,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Gratuito em repo publico. Em `pull_request` ele varre so os commits do
-      # PR; em `workflow_dispatch` varre o historico inteiro, entao a primeira
-      # rodada manual pode acusar coisa antiga. Se acontecer, gere a baseline:
-      #   gitleaks detect --report-path .gitleaks-baseline.json
-      # e aponte com GITLEAKS_CONFIG. Para fixar a acao por SHA em vez da tag:
+      # So em pull_request, e de proposito. Neste evento o gitleaks varre os
+      # commits do PR, que e o que este job existe para fazer: impedir que um
+      # segredo ENTRE pelo PR. Em workflow_dispatch ele varre o historico
+      # inteiro e devolve ruido.
+      #
+      # O historico foi varrido na mao em 19/09/2026: 77 achados, todos falso
+      # positivo. 60 sao UUID de no e texto de descricao nos `n8n/workflow-*.json`
+      # (os segredos de verdade la sao marcadores `__ALGO__`, e o .ready.json com
+      # valor real e gitignored); 8 sao exemplos de `curl -H Authorization` em
+      # README e plano; o resto e identificador longo, incluindo um
+      # `return {"status": "ok"}`. Nenhum `.env` jamais foi rastreado.
+      #
+      # Nao troque isto por um allowlist de caminho: allowlist em
+      # `chatbot-api/app/main.py` engoliria um segredo de verdade amanha.
+      # Para rever o historico de novo:
+      #   gitleaks detect --source . --report-path /tmp/leaks.json
+      #
+      # Para fixar a acao por SHA em vez da tag:
       #   gh api repos/gitleaks/gitleaks-action/git/ref/tags/v2 --jq .object.sha
       - name: gitleaks
+        if: github.event_name == 'pull_request'
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
