@@ -8,7 +8,8 @@ verificado_em: 2026-09-19
 # Script em /tmp via `fly ssh console` não importa `app` sem PYTHONPATH
 
 Em 19/09, o `e2e-loop/fila-dono.sh` (stdin do `fly ssh console -a app2037`)
-gravava o script em `/tmp/fila_dono.py` e rodava `python /tmp/fila_dono.py`
+gravava o script em /tmp/fila_dono.py — caminho dentro da machine, criado em
+tempo de execução, que não existe no repo — e rodava `python` nele
 depois de `cd /srv/chatbot`: o `import app` falhava porque `sys.path[0]` é o
 diretório do **script** (`/tmp`), não o cwd. O `cd` não adianta.
 
