@@ -286,7 +286,21 @@ class MotrixDriver(PlaywrightBankDriver):
                 self._passo_consulta_cpf(page, sol, ctx)
                 self._passo_veiculo(page, sol, ctx)
                 texto = self._passo_ler_ofertas(page, ctx)
-            except (RejeicaoNegocio, IntervencaoNecessaria, ErroTransitorio):
+            except RejeicaoNegocio:
+                self._screenshot_falha(page, "motrix_falha")
+                raise
+            except (IntervencaoNecessaria, ErroTransitorio):
+                # Print visivel na API: `_screenshot_falha` so grava no disco do
+                # worker, e o Portal le o blob. Sem o evento o passo que falhou
+                # (campo, botao, placa) fica sem a tela final.
+                self._evento(
+                    ctx,
+                    "motrix_falha",
+                    "Falha do Motrix; tela registrada para diagnostico.",
+                    page,
+                    True,
+                    nivel="erro",
+                )
                 self._screenshot_falha(page, "motrix_falha")
                 raise
             finally:
@@ -328,6 +342,7 @@ class MotrixDriver(PlaywrightBankDriver):
         if capturar_print and page is not None and config.EVENT_SCREENSHOTS:
             from app.motor.playwright_base import capturar_print_evento
 
+            self._trazer_resposta_para_a_tela(page)
             screenshot_path, screenshot_conteudo = capturar_print_evento(
                 page,
                 screenshot_dir=ctx.screenshot_dir or self.screenshot_dir,
@@ -341,6 +356,30 @@ class MotrixDriver(PlaywrightBankDriver):
             screenshot_path=screenshot_path,
             screenshot_conteudo=screenshot_conteudo,
         )
+
+    def _trazer_resposta_para_a_tela(self, page) -> None:
+        """Rola ate a resposta antes de fotografar.
+
+        O Motrix renderiza o aviso ("Nao ha oferta..."/"Cliente nao elegivel")
+        abaixo da dobra do modal: ele existe e e `is_visible()`, mas o
+        `mat-mdc-dialog-surface` fica por cima e o print saia do formulario do
+        passo 2 em vez da recusa (19/09). Rolar ate o alvo resolve. Sonda barata,
+        nunca levanta: se nada casar, a pagina e fotografada como esta.
+        """
+        alvos = (
+            page.locator(".ajin-error").first,
+            page.get_by_text(SEM_OFERTA).first,
+            page.get_by_text(NAO_ELEGIVEL).first,
+            page.get_by_text(CPF_INVALIDO).first,
+            page.get_by_text(_RE_PARCELA).first,
+        )
+        for alvo in alvos:
+            try:
+                if alvo.count() and alvo.is_visible():
+                    alvo.scroll_into_view_if_needed(timeout=3_000)
+                    return
+            except Exception:
+                continue
 
     # --- passos -------------------------------------------------------------
 
@@ -485,12 +524,35 @@ class MotrixDriver(PlaywrightBankDriver):
 
         corpo = page.inner_text("body")
         if CPF_INVALIDO.search(corpo):
+            self._evento(
+                ctx,
+                "cpf_invalido",
+                "Motrix nao aceitou o CPF; tela registrada.",
+                page,
+                True,
+                nivel="erro",
+            )
             raise RejeicaoNegocio("cpf_invalido", "Motrix não aceitou o CPF")
         if SEM_OFERTA.search(corpo) or NAO_ELEGIVEL.search(corpo):
+            self._evento(
+                ctx,
+                "cliente_nao_elegivel",
+                "Motrix recusou o credito na consulta do CPF; tela registrada.",
+                page,
+                True,
+            )
             raise RejeicaoNegocio(
                 "credito_recusado", "Motrix não aprovou crédito para este cliente"
             )
         if not ELEGIVEL.search(corpo):
+            self._evento(
+                ctx,
+                "elegibilidade_indefinida",
+                "Portal nao confirmou a elegibilidade; tela registrada.",
+                page,
+                True,
+                nivel="erro",
+            )
             raise ErroTransitorio(
                 "elegibilidade_indefinida", "portal não confirmou a elegibilidade"
             )
@@ -595,13 +657,25 @@ class MotrixDriver(PlaywrightBankDriver):
         try:
             page.wait_for_function(JS_TEM_RESPOSTA, timeout=prazo)
         except Exception as exc:
+            self._evento(
+                ctx,
+                "ofertas_sem_resposta",
+                "Portal nao devolveu oferta nem recusa; tela registrada.",
+                page,
+                True,
+                nivel="erro",
+            )
             raise ErroTransitorio(
                 "ofertas_sem_resposta", "portal não devolveu oferta nem recusa"
             ) from exc
-        page.wait_for_timeout(3_000)
+        # A resposta pode ser um aviso efêmero (a recusa some da tela e o wizard
+        # volta ao formulário). O print e o texto valem AGORA: esperar 3s antes,
+        # como era, fazia o Portal exibir o passo 2 em vez da recusa (19/09).
+        texto = page.inner_text("body")
         self._evento(ctx, "ofertas_lidas", "Resposta da simulação na tela.", page, True)
+        page.wait_for_timeout(3_000)
         # Para aqui: passos 3 (Confirmação) e 4 (Formalização) não são simulação.
-        return page.inner_text("body")
+        return texto
 
     def _aguardar_habilitado(self, locator, nome: str, tentativas: int = 30) -> None:
         """Espera o botão habilitar. Falha rápido em vez de clicar num disabled por

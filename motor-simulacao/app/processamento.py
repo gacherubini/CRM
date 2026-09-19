@@ -292,6 +292,7 @@ def _reconstruir_solicitacao(sim: SimulacaoORM) -> SolicitacaoSimulacao:
             ddd=pessoal.get("ddd"),
             celular=pessoal.get("celular"),
             codigo_natureza_ocupacao=pessoal.get("codigo_natureza_ocupacao"),
+            sexo=pessoal.get("sexo"),
         ),
         veiculo=Veiculo(
             categoria=sim.categoria or "moto",
