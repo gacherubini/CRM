@@ -59,22 +59,32 @@ os de banco estão na seção 4.
 |---|---|---|
 | `FLY_API_TOKEN` | `deploy-fly` | `fly tokens create deploy -a app2037 -x 8760h` |
 | `FLY_API_TOKEN_N8N` | `deploy-n8n` | `fly tokens create org -x 8760h` — precisa de escopo maior: o job usa `ssh sftp` e `machine exec`, que token de deploy não cobre |
-| `CLOUDFLARE_API_TOKEN` | `deploy-site` | dash.cloudflare.com → My Profile → API Tokens → template *Edit Cloudflare Workers* |
+| `CLOUDFLARE_API_TOKEN` | `deploy-site` | dash.cloudflare.com → My Profile → API Tokens → **Create Custom Token** com `Account` → `Cloudflare Pages` → **Edit**. O template *Edit Cloudflare Workers* não cobre Pages |
 | `CLOUDFLARE_ACCOUNT_ID` | `deploy-site` | canto direito do dashboard do Cloudflare |
 | `CHATBOT_WEBHOOK_TOKEN` | `deploy-n8n` | mesmo valor de `deploy/fly/3vm/.secrets.local` |
 | `EVOLUTION_API_KEY` | `deploy-n8n` | idem |
 
 ```bash
-fly tokens create deploy -a app2037 -x 8760h | gh secret set FLY_API_TOKEN
-fly tokens create org -x 8760h              | gh secret set FLY_API_TOKEN_N8N
-gh secret set CLOUDFLARE_API_TOKEN     # cola o valor e Ctrl+D
+fly tokens create deploy -a app2037 -x 8760h -n actions-deploy-app2037 | gh secret set FLY_API_TOKEN
+fly tokens create org -o crm-419 -x 8760h -n actions-n8n-ssh           | gh secret set FLY_API_TOKEN_N8N
+
+# Os que já existem em arquivo local
+gh secret set CHATBOT_WEBHOOK_TOKEN   # de deploy/fly/3vm/.secrets.local
+gh secret set EVOLUTION_API_KEY       # de deploy/fly/3vm/.evolution_key.local
+
+# Cloudflare: o `gh` pergunta "Paste your secret:", cola e dá Enter
+gh secret set CLOUDFLARE_API_TOKEN
+npx wrangler@3 whoami | grep -A2 'Account ID'   # pega o id e grava:
 gh secret set CLOUDFLARE_ACCOUNT_ID
-gh secret set CHATBOT_WEBHOOK_TOKEN
-gh secret set EVOLUTION_API_KEY
 ```
 
 Dois tokens do Fly de propósito. O de deploy é estreito e vive no workflow que
 roda a cada push; o de org é largo e só o `deploy-n8n` usa.
+
+> `EVOLUTION_API_KEY` **não** está no `.secrets.local`. Ela mora em
+> `.evolution_key.local`, que é o segundo lugar da cadeia que o
+> `prepare-workflow.ps1` consulta (`env` → `.evolution_key.local` →
+> `.secrets.local`).
 
 ---
 
