@@ -699,6 +699,11 @@ def _loja_por_phone_number_id(db: Session, phone_number_id: str):
     return db.get(models_db.Loja, loja_id) if loja_id else None
 
 
+# Texto do turno quando o cliente manda imagem: sem OCR nesta fase, o agente
+# recebe o marcador e decide em contexto (spec §5.10, e2e T9).
+TEXTO_IMAGEM_SEM_OCR = "[o cliente enviou uma imagem]"
+
+
 def _processar_mensagem_cliente(db: Session, loja, evento: EventoCloud) -> dict | None:
     """Persiste a mensagem do cliente e devolve o que o bot deve responder.
 
@@ -723,6 +728,12 @@ def _processar_mensagem_cliente(db: Session, loja, evento: EventoCloud) -> dict 
             texto = resultado.get("texto") or resultado.get("fallback")
         else:
             texto = config.AUDIO_FALLBACK_TEXT
+    elif evento.tipo == "imagem" and not (texto or "").strip():
+        # Sem OCR nesta fase (spec §5.10), mas sem texto o turno morre na
+        # guarda abaixo e o bot cala (e2e T9, 19/09). O marcador vira o texto
+        # do turno — persistido como a transcrição do áudio — e o agente
+        # decide em contexto (se esperava CPF/CNH, pede por texto).
+        texto = TEXTO_IMAGEM_SEM_OCR
     registro = servico.registrar_mensagem(
         db,
         evento.phone_number_id,
