@@ -244,6 +244,13 @@ class Mensagem(Base):
     direcao: Mapped[str] = mapped_column(String)  # entrada | saida
     provider_message_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     texto: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Conteúdo: "texto" (default) ou "audio" (Áudio do Vendedor, só Modo 2).
+    # media_ref aponta para o arquivo no volume; o banco nunca guarda binário.
+    tipo: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="texto", server_default="texto"
+    )
+    media_ref: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    duracao_segundos: Mapped[int | None] = mapped_column(Integer, nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 

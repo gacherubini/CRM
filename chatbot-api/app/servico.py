@@ -17,6 +17,7 @@ from sqlalchemy import and_, or_, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app import config
 from app.auth import hash_token
 from app.models_db import (
     CatalogAttribution,
@@ -1844,6 +1845,9 @@ def _resposta_saida_humana_duplicada(
         "mensagem_id": existente.id,
         "telefone": telefone,
         "texto": existente.texto,
+        "tipo": existente.tipo,
+        "media_ref": existente.media_ref,
+        "duracao_segundos": existente.duracao_segundos,
         "bot_ativo": bool(conversa.bot_ativo) if conversa else False,
         "status": conversa.status if conversa else "handoff",
         "enviado": True,
@@ -1958,11 +1962,208 @@ def enviar_mensagem_humana(
     }
 
 
+def _enviar_audio_saida(
+    db: Session,
+    loja_id: str,
+    *,
+    instance: str,
+    number: str,
+    audio: bytes,
+    filename: str,
+    mime: str,
+    mensagem_id: str,
+    canal_id: str | None,
+) -> None:
+    """Push do áudio pelo transporte da loja. Falha → 502, histórico preservado."""
+    from app.whatsapp_outbound import WhatsAppOutboundError, outbound_para_loja
+
+    try:
+        outbound_para_loja(db, loja_id).send_audio(
+            instance=instance,
+            number=number,
+            audio=audio,
+            filename=filename,
+            mime=mime,
+        )
+    except WhatsAppOutboundError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": getattr(exc, "code", None) or "cloud_media_failed",
+                "message": str(exc) or "falha ao enviar o áudio",
+                "mensagem_id": mensagem_id,
+                "bot_ativo": False,
+                "status": "handoff",
+                "enviado": False,
+                "canal_id": canal_id,
+                "preservado_no_historico": True,
+            },
+        ) from exc
+
+
+def enviar_audio_humano(
+    db: Session,
+    loja_id: str,
+    telefone: str,
+    conteudo: bytes,
+    *,
+    idempotency_key: str,
+    mime: str | None = None,
+    duracao_segundos: float | None = None,
+    instance: str | None = None,
+    ator: str | None = None,
+    media=None,
+) -> dict:
+    """Persiste o Áudio do Vendedor, pausa o bot e envia pela Cloud API.
+
+    Só Modo 2 (ADR-0002): fora dele responde 422. A conversão para ogg/opus e o
+    arquivo no volume ficam no port de mídia; aqui só a orquestração. Idempotente
+    por chave, igual ao texto.
+    """
+    from app import provisioning
+    from app.audio_humano import AudioMediaError, get_audio_media_port
+    from app.hardening import normalizar_telefone_webhook
+    from app.rodizio import loja_opera_modo2
+
+    if not provisioning.allows_outbound_whatsapp(db, loja_id):
+        raise HTTPException(
+            status_code=423,
+            detail={
+                "code": "store_not_operational",
+                "message": "loja não operacional",
+                "loja_operacional": False,
+            },
+        )
+    if not loja_opera_modo2(db, loja_id):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "audio_somente_cloud",
+                "message": "Áudio do Vendedor só é suportado no Modo 2 (Cloud API)",
+            },
+        )
+
+    try:
+        telefone_norm = normalizar_telefone_webhook(telefone)
+    except Exception:
+        raise HTTPException(status_code=422, detail="telefone inválido") from None
+
+    if not conteudo:
+        raise HTTPException(status_code=422, detail="áudio vazio")
+    if len(conteudo) > config.AUDIO_MAX_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "code": "audio_muito_grande",
+                "message": "áudio acima do limite permitido",
+            },
+        )
+    if duracao_segundos is not None and (
+        duracao_segundos <= 0
+        or duracao_segundos > config.AUDIO_MAX_DURATION_SECONDS
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "audio_muito_longo",
+                "message": "duração de áudio acima do limite permitido",
+            },
+        )
+
+    provider_message_id = _provider_id_humano(idempotency_key)
+    saida = _preparar_saida_humana(
+        db,
+        loja_id,
+        telefone_norm,
+        provider_message_id=provider_message_id,
+        instance=instance,
+        ator=ator,
+    )
+    if saida.ja_persistida is not None:
+        return _resposta_saida_humana_duplicada(
+            db, saida.ja_persistida, telefone=telefone_norm, ator=ator
+        )
+
+    conversa = saida.conversa
+    assert conversa is not None
+    port = media or get_audio_media_port()
+    mensagem_id = str(uuid.uuid4())
+    try:
+        armazenado = port.armazenar(
+            conteudo,
+            mime=mime or "audio/webm",
+            loja_id=loja_id,
+            mensagem_id=mensagem_id,
+            duracao=duracao_segundos,
+        )
+    except AudioMediaError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "audio_invalido",
+                "message": str(exc) or "áudio inválido",
+            },
+        ) from exc
+
+    existente = _persistir_saida_humana(
+        db,
+        Mensagem(
+            id=mensagem_id,
+            loja_id=loja_id,
+            canal_id=conversa.canal_id,
+            conversa_id=conversa.id,
+            direcao="saida",
+            provider_message_id=provider_message_id,
+            texto=None,
+            tipo="audio",
+            media_ref=armazenado.media_ref,
+            duracao_segundos=armazenado.duracao_segundos,
+        ),
+    )
+    if existente is not None:
+        # Corrida de idempotência: descarta o arquivo que acabou de ser gravado.
+        port.apagar(armazenado.media_ref)
+        return _resposta_saida_humana_duplicada(
+            db, existente, telefone=telefone_norm, ator=ator
+        )
+
+    _enviar_audio_saida(
+        db,
+        loja_id,
+        instance=saida.instance_envio,
+        number=telefone_norm,
+        audio=armazenado.conteudo,
+        filename=f"{mensagem_id}.ogg",
+        mime=armazenado.mime,
+        mensagem_id=mensagem_id,
+        canal_id=conversa.canal_id,
+    )
+
+    return {
+        "duplicada": False,
+        "mensagem_id": mensagem_id,
+        "telefone": telefone_norm,
+        "texto": None,
+        "tipo": "audio",
+        "media_ref": armazenado.media_ref,
+        "duracao_segundos": armazenado.duracao_segundos,
+        "bot_ativo": False,
+        "status": "handoff",
+        "enviado": True,
+        "canal_id": conversa.canal_id,
+        "ator": ator,
+        "evolution_instance": saida.instance_envio,
+    }
+
+
 def para_saida_mensagem(msg: Mensagem) -> dict:
     return {
         "id": msg.id,
         "direcao": msg.direcao,
         "texto": mascarar_cpf(msg.texto),
+        "tipo": msg.tipo,
+        "media_ref": msg.media_ref,
+        "duracao_segundos": msg.duracao_segundos,
         "criada_em": msg.criada_em.isoformat() if msg.criada_em else None,
     }
 

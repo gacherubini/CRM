@@ -74,6 +74,18 @@ class WhatsAppOutboundPort(Protocol):
         """Envia texto. Retorna payload do provedor (opaco). Levanta WhatsAppOutboundError."""
         ...
 
+    def send_audio(
+        self,
+        *,
+        instance: str,
+        number: str,
+        audio: bytes,
+        filename: str = "voz.ogg",
+        mime: str = "audio/ogg",
+    ) -> dict[str, Any]:
+        """Envia áudio. Só a Cloud implementa; a Evolution recusa."""
+        ...
+
 
 class EvolutionWhatsAppOutbound:
     """POST /message/sendText/{instance} na Evolution API.
@@ -176,12 +188,28 @@ class EvolutionWhatsAppOutbound:
                 code="evolution_unreachable",
             ) from exc
 
+    def send_audio(
+        self,
+        *,
+        instance: str,
+        number: str,
+        audio: bytes,
+        filename: str = "voz.ogg",
+        mime: str = "audio/ogg",
+    ) -> dict[str, Any]:
+        """Áudio humano é só na Cloud (ADR-0002); a Evolution recusa explícito."""
+        raise WhatsAppOutboundError(
+            "áudio do vendedor só é suportado na Cloud API",
+            code="audio_cloud_only",
+        )
+
 
 @dataclass
 class FakeWhatsAppOutbound:
     """Adapter de teste: grava chamadas; pode simular falha."""
 
     calls: list[dict[str, str]] = field(default_factory=list)
+    audios: list[dict[str, Any]] = field(default_factory=list)
     fail: bool = False
     fail_code: str = "evolution_send_failed"
     fail_message: str = "Evolution indisponível (fake)"
@@ -198,6 +226,28 @@ class FakeWhatsAppOutbound:
     ) -> dict[str, Any]:
         self.calls.append(
             {"instance": instance, "number": number, "text": text}
+        )
+        if self.fail:
+            raise WhatsAppOutboundError(self.fail_message, code=self.fail_code)
+        return dict(self.response)
+
+    def send_audio(
+        self,
+        *,
+        instance: str,
+        number: str,
+        audio: bytes,
+        filename: str = "voz.ogg",
+        mime: str = "audio/ogg",
+    ) -> dict[str, Any]:
+        self.audios.append(
+            {
+                "instance": instance,
+                "number": number,
+                "audio": audio,
+                "filename": filename,
+                "mime": mime,
+            }
         )
         if self.fail:
             raise WhatsAppOutboundError(self.fail_message, code=self.fail_code)
@@ -281,6 +331,67 @@ class CloudWhatsAppOutbound:
             "type": "text",
             "text": {"body": text},
         })
+
+    def send_audio(
+        self,
+        *,
+        instance: str,
+        number: str,
+        audio: bytes,
+        filename: str = "voz.ogg",
+        mime: str = "audio/ogg",
+    ) -> dict[str, Any]:
+        """Dois passos na Cloud: sobe a mídia e envia o áudio por ``id``."""
+        media_id = self._upload_media(
+            instance=instance, audio=audio, filename=filename, mime=mime
+        )
+        return self._post(instance, {
+            "messaging_product": "whatsapp",
+            "to": number,
+            "type": "audio",
+            "audio": {"id": media_id},
+        })
+
+    def _upload_media(
+        self, *, instance: str, audio: bytes, filename: str, mime: str
+    ) -> str:
+        if not self.token:
+            raise WhatsAppOutboundError("Cloud API não configurada")
+        try:
+            with httpx.Client(
+                timeout=self.timeout,
+                transport=self._transport,
+                headers={"Authorization": f"Bearer {self.token}"},
+            ) as cliente:
+                resposta = cliente.post(
+                    f"{self.base_url}/{instance}/media",
+                    data={"messaging_product": "whatsapp", "type": mime},
+                    files={"file": (filename, audio, mime)},
+                )
+                if resposta.status_code >= 400:
+                    detalhe = _sanitizar_corpo_erro(resposta.text, self.token)
+                    logger.warning(
+                        "Cloud media upload falhou status=%s corpo=%s",
+                        resposta.status_code,
+                        detalhe,
+                    )
+                    raise WhatsAppOutboundError(
+                        f"Cloud recusou a mídia (HTTP {resposta.status_code}): {detalhe}",
+                        code="cloud_media_failed",
+                    )
+                dados = resposta.json()
+        except WhatsAppOutboundError:
+            raise
+        except (httpx.HTTPError, ValueError) as exc:
+            raise WhatsAppOutboundError(
+                f"falha no upload de mídia: {exc}", code="cloud_media_failed"
+            ) from exc
+        media_id = str((dados or {}).get("id") or "")
+        if not media_id:
+            raise WhatsAppOutboundError(
+                "Cloud não devolveu id de mídia", code="cloud_media_failed"
+            )
+        return media_id
 
     def marcar_lido_e_digitando(self, *, instance: str, wamid: str) -> dict[str, Any]:
         """Acende o "digitando…" para o cliente — e marca a entrada como lida.

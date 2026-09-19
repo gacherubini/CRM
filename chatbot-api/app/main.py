@@ -13,7 +13,7 @@ from typing import Optional
 from typing import Literal
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
@@ -36,6 +36,7 @@ from app import (  # noqa: F401 (registra os modelos)
     solicitacoes_simulacao,
 )
 from app.audio import AudioProcessor, get_audio_processor, processador_de_audio
+from app.audio_humano import AudioMediaPort, get_audio_media_port
 from app.cloud_retry import registrar_evento_falho
 from app.meta_webhook import EventoCloud, assinatura_valida, parse_inbound
 from app.meta_onboarding import NOME_TEMPLATE, OnboardingErro
@@ -1116,6 +1117,48 @@ def enviar_mensagem_humana(
         idempotency_key=dados.idempotency_key,
         instance=dados.instance,
         ator=dados.ator,
+    )
+
+
+@app.post("/v1/conversas/{telefone}/audios")
+async def enviar_audio_humano(
+    telefone: str,
+    arquivo: UploadFile = File(...),
+    idempotency_key: str = Form(..., min_length=1, max_length=120),
+    instance: Optional[str] = Form(default=None),
+    ator: Optional[str] = Form(default=None, max_length=320),
+    duracao_segundos: Optional[float] = Form(default=None, ge=0),
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+    media: AudioMediaPort = Depends(get_audio_media_port),
+):
+    """Áudio do Vendedor (Portal → Cloud API). Só Modo 2; 422 fora dele.
+
+    Idempotente por ``idempotency_key`` como o texto. O arquivo é convertido e
+    guardado pelo port de mídia; a rota só lê os bytes com teto.
+    """
+    _exigir_loja_operacional(db, ctx.loja_id)
+    limite = config.AUDIO_MAX_BYTES
+    conteudo = await arquivo.read(limite + 1)
+    if len(conteudo) > limite:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "code": "audio_muito_grande",
+                "message": "áudio acima do limite permitido",
+            },
+        )
+    return servico.enviar_audio_humano(
+        db,
+        ctx.loja_id,
+        telefone,
+        conteudo,
+        idempotency_key=idempotency_key,
+        mime=arquivo.content_type,
+        duracao_segundos=duracao_segundos,
+        instance=instance,
+        ator=ator,
+        media=media,
     )
 
 

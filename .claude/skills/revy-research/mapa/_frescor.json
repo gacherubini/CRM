@@ -1,5 +1,5 @@
 {
- "sha": "6ef5fd6",
+ "sha": "347396c",
  "inventario": {
   "chatbot-api": [
    {
@@ -14,14 +14,14 @@
     "chave": "CHATBOT_WHATSAPP_MODO2_ENABLED (default: '')",
     "simbolo": "CHATBOT_WHATSAPP_MODO2_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 146
+    "linha": 149
    },
    {
     "secao": "flag",
     "chave": "MULTI_WHATSAPP_ENABLED (default: 0)",
     "simbolo": "MULTI_WHATSAPP_ENABLED",
     "arquivo": "app/config.py",
-    "linha": 149
+    "linha": 152
    },
    {
     "secao": "worker",
@@ -35,462 +35,469 @@
     "chave": "GET /health/live",
     "simbolo": "/health/live",
     "arquivo": "app/main.py",
-    "linha": 523
+    "linha": 524
    },
    {
     "secao": "rota",
     "chave": "GET /health/ready",
     "simbolo": "/health/ready",
     "arquivo": "app/main.py",
-    "linha": 528
+    "linha": 529
    },
    {
     "secao": "rota",
     "chave": "GET /version",
     "simbolo": "/version",
     "arquivo": "app/main.py",
-    "linha": 534
+    "linha": 535
    },
    {
     "secao": "rota",
     "chave": "GET /webhook/cloud",
     "simbolo": "/webhook/cloud",
     "arquivo": "app/main.py",
-    "linha": 539
+    "linha": 540
    },
    {
     "secao": "rota",
     "chave": "POST /webhook/cloud",
     "simbolo": "/webhook/cloud",
     "arquivo": "app/main.py",
-    "linha": 556
+    "linha": 557
    },
    {
     "secao": "rota",
     "chave": "POST /webhook/mensagem",
     "simbolo": "/webhook/mensagem",
     "arquivo": "app/main.py",
-    "linha": 802
+    "linha": 803
    },
    {
     "secao": "rota",
     "chave": "POST /webhook/audio/transcrever",
     "simbolo": "/webhook/audio/transcrever",
     "arquivo": "app/main.py",
-    "linha": 827
+    "linha": 828
    },
    {
     "secao": "rota",
     "chave": "POST /v1/operacao/roteamento",
     "simbolo": "/v1/operacao/roteamento",
     "arquivo": "app/main.py",
-    "linha": 863
+    "linha": 864
    },
    {
     "secao": "rota",
     "chave": "POST /webhook/operacao/veiculos/foto",
     "simbolo": "/webhook/operacao/veiculos/foto",
     "arquivo": "app/main.py",
-    "linha": 883
+    "linha": 884
    },
    {
     "secao": "rota",
     "chave": "GET /v1/conversas",
     "simbolo": "/v1/conversas",
     "arquivo": "app/main.py",
-    "linha": 921
+    "linha": 922
    },
    {
     "secao": "rota",
     "chave": "GET /v1/conversas/{telefone}/mensagens",
     "simbolo": "/v1/conversas/{telefone}/mensagens",
     "arquivo": "app/main.py",
-    "linha": 938
+    "linha": 939
    },
    {
     "secao": "rota",
     "chave": "GET /v1/conversas/{telefone}/estado",
     "simbolo": "/v1/conversas/{telefone}/estado",
     "arquivo": "app/main.py",
-    "linha": 971
+    "linha": 972
    },
    {
     "secao": "rota",
     "chave": "POST /v1/conversas/{telefone}/pode-responder",
     "simbolo": "/v1/conversas/{telefone}/pode-responder",
     "arquivo": "app/main.py",
-    "linha": 988
+    "linha": 989
    },
    {
     "secao": "rota",
     "chave": "PATCH /v1/conversas/{telefone}/estado",
     "simbolo": "/v1/conversas/{telefone}/estado",
     "arquivo": "app/main.py",
-    "linha": 1034
+    "linha": 1035
    },
    {
     "secao": "rota",
     "chave": "POST /v1/conversas/{telefone}/mensagens",
     "simbolo": "/v1/conversas/{telefone}/mensagens",
     "arquivo": "app/main.py",
-    "linha": 1097
+    "linha": 1098
+   },
+   {
+    "secao": "rota",
+    "chave": "POST /v1/conversas/{telefone}/audios",
+    "simbolo": "/v1/conversas/{telefone}/audios",
+    "arquivo": "app/main.py",
+    "linha": 1123
    },
    {
     "secao": "rota",
     "chave": "POST /v1/consentimentos",
     "simbolo": "/v1/consentimentos",
     "arquivo": "app/main.py",
-    "linha": 1122
+    "linha": 1165
    },
    {
     "secao": "rota",
     "chave": "POST /v1/leads",
     "simbolo": "/v1/leads",
     "arquivo": "app/main.py",
-    "linha": 1135
+    "linha": 1178
    },
    {
     "secao": "rota",
     "chave": "POST /v1/integracoes/catalogo/interesses",
     "simbolo": "/v1/integracoes/catalogo/interesses",
     "arquivo": "app/main.py",
-    "linha": 1146
+    "linha": 1189
    },
    {
     "secao": "rota",
     "chave": "GET /v1/leads",
     "simbolo": "/v1/leads",
     "arquivo": "app/main.py",
-    "linha": 1180
+    "linha": 1223
    },
    {
     "secao": "rota",
     "chave": "GET /v1/funil/eventos",
     "simbolo": "/v1/funil/eventos",
     "arquivo": "app/main.py",
-    "linha": 1190
+    "linha": 1233
    },
    {
     "secao": "rota",
     "chave": "GET /v1/auditoria/ctwa",
     "simbolo": "/v1/auditoria/ctwa",
     "arquivo": "app/main.py",
-    "linha": 1209
+    "linha": 1252
    },
    {
     "secao": "rota",
     "chave": "GET /v1/atendimento/resumo",
     "simbolo": "/v1/atendimento/resumo",
     "arquivo": "app/main.py",
-    "linha": 1261
+    "linha": 1304
    },
    {
     "secao": "rota",
     "chave": "GET /v1/leads.csv",
     "simbolo": "/v1/leads.csv",
     "arquivo": "app/main.py",
-    "linha": 1273
+    "linha": 1316
    },
    {
     "secao": "rota",
     "chave": "GET /v1/leads/{lead_id}",
     "simbolo": "/v1/leads/{lead_id}",
     "arquivo": "app/main.py",
-    "linha": 1319
+    "linha": 1362
    },
    {
     "secao": "rota",
     "chave": "PATCH /v1/leads/{lead_id}/etapa",
     "simbolo": "/v1/leads/{lead_id}/etapa",
     "arquivo": "app/main.py",
-    "linha": 1326
+    "linha": 1369
    },
    {
     "secao": "rota",
     "chave": "GET /v1/config/catalogo-bot",
     "simbolo": "/v1/config/catalogo-bot",
     "arquivo": "app/main.py",
-    "linha": 1338
+    "linha": 1381
    },
    {
     "secao": "rota",
     "chave": "GET /v1/agente/config",
     "simbolo": "/v1/agente/config",
     "arquivo": "app/main.py",
-    "linha": 1383
+    "linha": 1426
    },
    {
     "secao": "rota",
     "chave": "GET /v1/agente/rascunho",
     "simbolo": "/v1/agente/rascunho",
     "arquivo": "app/main.py",
-    "linha": 1433
+    "linha": 1476
    },
    {
     "secao": "rota",
     "chave": "PUT /v1/agente/rascunho",
     "simbolo": "/v1/agente/rascunho",
     "arquivo": "app/main.py",
-    "linha": 1444
+    "linha": 1487
    },
    {
     "secao": "rota",
     "chave": "POST /v1/agente/publicar",
     "simbolo": "/v1/agente/publicar",
     "arquivo": "app/main.py",
-    "linha": 1459
+    "linha": 1502
    },
    {
     "secao": "rota",
     "chave": "POST /v1/agente/preview",
     "simbolo": "/v1/agente/preview",
     "arquivo": "app/main.py",
-    "linha": 1486
+    "linha": 1529
    },
    {
     "secao": "rota",
     "chave": "GET /v1/agente/versoes",
     "simbolo": "/v1/agente/versoes",
     "arquivo": "app/main.py",
-    "linha": 1543
+    "linha": 1586
    },
    {
     "secao": "rota",
     "chave": "POST /v1/agente/versoes/{versao_id}/restaurar",
     "simbolo": "/v1/agente/versoes/{versao_id}/restaurar",
     "arquivo": "app/main.py",
-    "linha": 1563
+    "linha": 1606
    },
    {
     "secao": "rota",
     "chave": "GET /v1/estoque/buscar",
     "simbolo": "/v1/estoque/buscar",
     "arquivo": "app/main.py",
-    "linha": 1581
+    "linha": 1624
    },
    {
     "secao": "rota",
     "chave": "GET /v1/estoque/por-placa/{placa}",
     "simbolo": "/v1/estoque/por-placa/{placa}",
     "arquivo": "app/main.py",
-    "linha": 1607
+    "linha": 1650
    },
    {
     "secao": "rota",
     "chave": "GET /v1/estoque/veiculos/{veiculo_id}/midia-principal",
     "simbolo": "/v1/estoque/veiculos/{veiculo_id}/midia-principal",
     "arquivo": "app/main.py",
-    "linha": 1624
+    "linha": 1667
    },
    {
     "secao": "rota",
     "chave": "POST /v1/internal/provisioning/state",
     "simbolo": "/v1/internal/provisioning/state",
     "arquivo": "app/main.py",
-    "linha": 1712
+    "linha": 1755
    },
    {
     "secao": "rota",
     "chave": "POST /v1/simulacoes/solicitar",
     "simbolo": "/v1/simulacoes/solicitar",
     "arquivo": "app/main.py",
-    "linha": 1733
+    "linha": 1776
    },
    {
     "secao": "rota",
     "chave": "POST /v1/simular",
     "simbolo": "/v1/simular",
     "arquivo": "app/main.py",
-    "linha": 1772
+    "linha": 1815
    },
    {
     "secao": "rota",
     "chave": "GET /v1/whatsapp/canais",
     "simbolo": "/v1/whatsapp/canais",
     "arquivo": "app/main.py",
-    "linha": 1839
+    "linha": 1882
    },
    {
     "secao": "rota",
     "chave": "POST /v1/whatsapp/canais",
     "simbolo": "/v1/whatsapp/canais",
     "arquivo": "app/main.py",
-    "linha": 1851
+    "linha": 1894
    },
    {
     "secao": "rota",
     "chave": "POST /v1/whatsapp/canais/cloud/onboarding",
     "simbolo": "/v1/whatsapp/canais/cloud/onboarding",
     "arquivo": "app/main.py",
-    "linha": 1879
+    "linha": 1922
    },
    {
     "secao": "rota",
     "chave": "POST /v1/whatsapp/canais/{canal_id}/principal-estoque",
     "simbolo": "/v1/whatsapp/canais/{canal_id}/principal-estoque",
     "arquivo": "app/main.py",
-    "linha": 1923
+    "linha": 1966
    },
    {
     "secao": "rota",
     "chave": "POST /v1/whatsapp/canais/{canal_id}/inativar",
     "simbolo": "/v1/whatsapp/canais/{canal_id}/inativar",
     "arquivo": "app/main.py",
-    "linha": 1933
+    "linha": 1976
    },
    {
     "secao": "rota",
     "chave": "POST /v1/whatsapp/canais/{canal_id}/connect",
     "simbolo": "/v1/whatsapp/canais/{canal_id}/connect",
     "arquivo": "app/main.py",
-    "linha": 1943
+    "linha": 1986
    },
    {
     "secao": "rota",
     "chave": "GET /v1/whatsapp/canais/{canal_id}/status",
     "simbolo": "/v1/whatsapp/canais/{canal_id}/status",
     "arquivo": "app/main.py",
-    "linha": 1960
+    "linha": 2003
    },
    {
     "secao": "rota",
     "chave": "POST /v1/whatsapp/canais/{canal_id}/disconnect",
     "simbolo": "/v1/whatsapp/canais/{canal_id}/disconnect",
     "arquivo": "app/main.py",
-    "linha": 1970
+    "linha": 2013
    },
    {
     "secao": "rota",
     "chave": "GET /v1/fila-vendedores",
     "simbolo": "/v1/fila-vendedores",
     "arquivo": "app/main.py",
-    "linha": 2002
+    "linha": 2045
    },
    {
     "secao": "rota",
     "chave": "GET /v1/ofertas",
     "simbolo": "/v1/ofertas",
     "arquivo": "app/main.py",
-    "linha": 2011
+    "linha": 2054
    },
    {
     "secao": "rota",
     "chave": "POST /v1/ofertas/{oferta_id}/assumir",
     "simbolo": "/v1/ofertas/{oferta_id}/assumir",
     "arquivo": "app/main.py",
-    "linha": 2048
+    "linha": 2091
    },
    {
     "secao": "rota",
     "chave": "POST /v1/fila-vendedores",
     "simbolo": "/v1/fila-vendedores",
     "arquivo": "app/main.py",
-    "linha": 2069
+    "linha": 2112
    },
    {
     "secao": "rota",
     "chave": "PATCH /v1/fila-vendedores/{vendedor_id}",
     "simbolo": "/v1/fila-vendedores/{vendedor_id}",
     "arquivo": "app/main.py",
-    "linha": 2088
+    "linha": 2131
    },
    {
     "secao": "rota",
     "chave": "DELETE /v1/fila-vendedores/{vendedor_id}",
     "simbolo": "/v1/fila-vendedores/{vendedor_id}",
     "arquivo": "app/main.py",
-    "linha": 2119
+    "linha": 2162
    },
    {
     "secao": "rota",
     "chave": "POST /v1/operacao/solicitacoes-simulacao-humana",
     "simbolo": "/v1/operacao/solicitacoes-simulacao-humana",
     "arquivo": "app/main.py",
-    "linha": 2140
+    "linha": 2183
    },
    {
     "secao": "rota",
     "chave": "POST /v1/operacao/responder",
     "simbolo": "/v1/operacao/responder",
     "arquivo": "app/main.py",
-    "linha": 2180
+    "linha": 2223
    },
    {
     "secao": "rota",
     "chave": "POST /v1/operacao/handoff-humano",
     "simbolo": "/v1/operacao/handoff-humano",
     "arquivo": "app/main.py",
-    "linha": 2232
+    "linha": 2275
    },
    {
     "secao": "rota",
     "chave": "POST /v1/operacao/moto-escolhida",
     "simbolo": "/v1/operacao/moto-escolhida",
     "arquivo": "app/main.py",
-    "linha": 2280
+    "linha": 2323
    },
    {
     "secao": "rota",
     "chave": "GET /v1/operacao/grupo-estoque",
     "simbolo": "/v1/operacao/grupo-estoque",
     "arquivo": "app/main.py",
-    "linha": 2308
+    "linha": 2351
    },
    {
     "secao": "rota",
     "chave": "PUT /v1/operacao/grupo-estoque",
     "simbolo": "/v1/operacao/grupo-estoque",
     "arquivo": "app/main.py",
-    "linha": 2327
+    "linha": 2370
    },
    {
     "secao": "rota",
     "chave": "DELETE /v1/operacao/grupo-estoque",
     "simbolo": "/v1/operacao/grupo-estoque",
     "arquivo": "app/main.py",
-    "linha": 2354
+    "linha": 2397
    },
    {
     "secao": "rota",
     "chave": "GET /v1/operacao/numeros-autorizados",
     "simbolo": "/v1/operacao/numeros-autorizados",
     "arquivo": "app/main.py",
-    "linha": 2361
+    "linha": 2404
    },
    {
     "secao": "rota",
     "chave": "POST /v1/operacao/numeros-autorizados",
     "simbolo": "/v1/operacao/numeros-autorizados",
     "arquivo": "app/main.py",
-    "linha": 2368
+    "linha": 2411
    },
    {
     "secao": "rota",
     "chave": "DELETE /v1/operacao/numeros-autorizados/{telefone}",
     "simbolo": "/v1/operacao/numeros-autorizados/{telefone}",
     "arquivo": "app/main.py",
-    "linha": 2379
+    "linha": 2422
    },
    {
     "secao": "rota",
     "chave": "POST /v1/operacao/veiculos",
     "simbolo": "/v1/operacao/veiculos",
     "arquivo": "app/main.py",
-    "linha": 2388
+    "linha": 2431
    },
    {
     "secao": "flag",
     "chave": "CHATBOT_NOTIF_RETRY_ENABLED (default: 1)",
     "simbolo": "CHATBOT_NOTIF_RETRY_ENABLED",
     "arquivo": "app/main.py",
-    "linha": 87
+    "linha": 88
    },
    {
     "secao": "flag",
     "chave": "CHATBOT_MODO2_WORKERS_ENABLED (default: 1)",
     "simbolo": "CHATBOT_MODO2_WORKERS_ENABLED",
     "arquivo": "app/main.py",
-    "linha": 99
+    "linha": 100
    },
    {
     "secao": "modelo",
@@ -560,70 +567,70 @@
     "chave": "leads",
     "simbolo": "leads",
     "arquivo": "app/models_db.py",
-    "linha": 251
+    "linha": 258
    },
    {
     "secao": "modelo",
     "chave": "consentimentos",
     "simbolo": "consentimentos",
     "arquivo": "app/models_db.py",
-    "linha": 308
+    "linha": 315
    },
    {
     "secao": "modelo",
     "chave": "catalog_attributions",
     "simbolo": "catalog_attributions",
     "arquivo": "app/models_db.py",
-    "linha": 323
+    "linha": 330
    },
    {
     "secao": "modelo",
     "chave": "ctwa_auditoria",
     "simbolo": "ctwa_auditoria",
     "arquivo": "app/models_db.py",
-    "linha": 355
+    "linha": 362
    },
    {
     "secao": "modelo",
     "chave": "numeros_autorizados",
     "simbolo": "numeros_autorizados",
     "arquivo": "app/models_db.py",
-    "linha": 378
+    "linha": 385
    },
    {
     "secao": "modelo",
     "chave": "grupos_estoque",
     "simbolo": "grupos_estoque",
     "arquivo": "app/models_db.py",
-    "linha": 406
+    "linha": 413
    },
    {
     "secao": "modelo",
     "chave": "notificacoes_operacionais",
     "simbolo": "notificacoes_operacionais",
     "arquivo": "app/models_db.py",
-    "linha": 425
+    "linha": 432
    },
    {
     "secao": "modelo",
     "chave": "cloud_evento_falho",
     "simbolo": "cloud_evento_falho",
     "arquivo": "app/models_db.py",
-    "linha": 466
+    "linha": 473
    },
    {
     "secao": "modelo",
     "chave": "agente_config_versao",
     "simbolo": "agente_config_versao",
     "arquivo": "app/models_db.py",
-    "linha": 493
+    "linha": 500
    },
    {
     "secao": "modelo",
     "chave": "agente_config",
     "simbolo": "agente_config",
     "arquivo": "app/models_db.py",
-    "linha": 529
+    "linha": 536
    },
    {
     "secao": "worker",
@@ -833,6 +840,13 @@
     "chave": "0028_canal_onboarding",
     "simbolo": "0028_canal_onboarding",
     "arquivo": "alembic/versions/0028_canal_onboarding.py",
+    "linha": 0
+   },
+   {
+    "secao": "migration",
+    "chave": "0029_mensagem_audio",
+    "simbolo": "0029_mensagem_audio",
+    "arquivo": "alembic/versions/0029_mensagem_audio.py",
     "linha": 0
    }
   ],

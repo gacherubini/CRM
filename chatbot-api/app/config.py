@@ -46,6 +46,9 @@ AUDIO_TRANSCRIPTION_MODEL = os.getenv(
 AUDIO_MAX_BYTES = int(os.getenv("CHATBOT_AUDIO_MAX_BYTES", str(8 * 1024 * 1024)))
 AUDIO_MAX_DURATION_SECONDS = int(os.getenv("CHATBOT_AUDIO_MAX_DURATION_SECONDS", "180"))
 AUDIO_DOWNLOAD_TIMEOUT = float(os.getenv("CHATBOT_AUDIO_DOWNLOAD_TIMEOUT", "10"))
+# Áudio do Vendedor (saída humana): arquivo no volume, convertido para ogg/opus.
+AUDIO_MEDIA_DIR = os.getenv("CHATBOT_AUDIO_MEDIA_DIR", "/data/media/audio")
+AUDIO_TRANSCODE_TIMEOUT = float(os.getenv("CHATBOT_AUDIO_TRANSCODE_TIMEOUT", "20"))
 AUDIO_TRANSCRIPTION_TIMEOUT = float(
     os.getenv("CHATBOT_AUDIO_TRANSCRIPTION_TIMEOUT", "15")
 )
