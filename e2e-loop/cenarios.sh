@@ -139,7 +139,7 @@ T8_simulacao() { # jornada CPF -> nascimento -> CNH -> solicitacao enfileirada
   # Modo 2: nao ha alerta de grupo — a entrega ao vendedor E a oferta.
   # 1) oferta aberta para este cliente; 2) rastro "oferta enviada" no log.
   t_api T8-oferta "api_ofertas aberta" "$GABRIEL_DIGITS" "oferta aberta ao vendedor" || return 1
-  local ofid; ofid="$(python3 -c "
+  local ofid; ofid="$("$PY" -c "
 import json
 d = json.load(open('$LOG_DIR/api-T8-oferta.json'))
 cands = [o for o in d if o.get('telefone_cliente', '').endswith('80336365')]

@@ -20,7 +20,7 @@ api_get() { # $1 = path com query
 # Textos de ENTRADA (cliente) criados depois de $1 (ISO UTC). Um por linha.
 api_entradas_apos() { # $1 = ISO-8601 UTC
   api_get "/v1/conversas/$GABRIEL_DIGITS/mensagens?instance=$PHONE_NUMBER_ID&after_criada_em=$1&limit=50" 2>/dev/null \
-    | python3 -c "
+    | "$PY" -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -35,7 +35,7 @@ for m in d.get('mensagens', []):
 # Textos de SAIDA (bot) criados depois de $1 (ISO UTC). Um por linha.
 api_saidas_apos() { # $1 = ISO-8601 UTC
   api_get "/v1/conversas/$GABRIEL_DIGITS/mensagens?instance=$PHONE_NUMBER_ID&after_criada_em=$1&limit=50" 2>/dev/null \
-    | python3 -c "
+    | "$PY" -c "
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -66,7 +66,7 @@ api_post() { # $1 = path, $2 = json body (opcional)
 
 # Id da oferta aberta para o telefone de teste (vazio se nao houver).
 api_oferta_aberta_id() {
-  api_ofertas aberta 2>/dev/null | python3 -c "
+  api_ofertas aberta 2>/dev/null | "$PY" -c "
 import json, sys
 try:
     d = json.load(sys.stdin)

@@ -12,6 +12,20 @@ API_BASE="${API_BASE:-https://app2037.fly.dev}"
 E2E_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOKEN_FILE="$E2E_DIR/.token"
 LOG_DIR="$E2E_DIR/logs/run-$(date +%Y%m%d-%H%M%S)"
+# Interpretador do oraculo. O Mac do dono so tem `python3`; no Windows o
+# `python3` do PATH costuma ser o stub da Microsoft Store, que EXISTE, sai 49 e
+# nao imprime nada. Escolher por `command -v` cai nessa: o oraculo devolveria
+# vazio e todo cenario ficaria vermelho com "bot nao respondeu". Por isso o
+# teste e execucao, nao presenca.
+if python3 -c "" >/dev/null 2>&1; then
+  PY=python3
+elif python -c "" >/dev/null 2>&1; then
+  PY=python
+else
+  echo "ERRO: sem python utilizavel (tentei python3 e python)" >&2
+  exit 2
+fi
+
 WAIT_SECS=150
 POLL_SECS=10
 # T8: o "Peguei" e o unico passo que so o aparelho do vendedor faz.

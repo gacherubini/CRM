@@ -17,6 +17,13 @@ mkdir -p "$LOG_DIR"
 . "$E2E_DIR/cenarios.sh"
 
 chmod +x "$E2E_DIR"/*.sh
+
+# A ponte e quem envia. Sem ela cada cenario morre no timeout do wait: vermelho
+# em tudo, e nenhum deles diz "nao ha ponte". Falhar aqui, uma vez, custa menos.
+command -v openclaw >/dev/null 2>&1 || {
+  echo "ERRO: openclaw nao esta no PATH — sem ponte nao ha envio de WhatsApp." >&2
+  exit 2
+}
 e2e_log "inicio loop e2e chip=$CHIP log=$LOG_DIR"
 e2e_log "ponte: $(openclaw channels status 2>/dev/null | grep -i whatsapp | head -n 1)"
 

@@ -138,11 +138,16 @@ loop) entra na `fila_vendedor` da loja teste. Consequências, todas queridas:
 ### Falta aplicar em produção
 
 O cadastro na fila não foi aplicado: escrita remota bloqueada na sessão que
-escreveu isto. Comando (roda uma vez, com `fly auth login` da conta Revy) em
-`e2e-loop/fila-dono.py`:
+escreveu isto. Roda uma vez, com `fly auth login` da conta Revy:
 
 ```bash
+# macOS / Git Bash
 fly ssh console -a app2037 < e2e-loop/fila-dono.sh
+```
+
+```powershell
+# PowerShell: nao tem redirecionamento de entrada (`<` e reservado)
+Get-Content e2e-loopila-dono.sh -Raw | fly ssh console -a app2037
 ```
 
 Pela tela dá no mesmo: Loja → WhatsApp → Fila
@@ -171,4 +176,12 @@ L=$(ls -td /tmp/revy_e2e/logs/run-* | head -n 1); grep -h "PASSOU\|FALHOU\|PARAD
 
 Pré-requisitos: `fly auth login` (conta Revy), `./provisionar.sh` uma vez
 (token em `.token`, fora do git), ponte WhatsApp com allowlist do teste.
+
+**Onde o loop roda.** Ele precisa do `openclaw` no PATH — é a ponte que envia
+pelo WhatsApp do dono. Na máquina Windows dele o `openclaw` não está instalado,
+então o loop inteiro é trabalho de Mac por enquanto; `run.sh` agora falha na
+hora, com mensagem, em vez de pintar todo cenário de vermelho por timeout.
+O oráculo deixou de chamar `python3` direto: o `python3` do PATH no Windows é o
+stub da Microsoft Store, que existe, **sai 49 e imprime nada**. `config.sh`
+escolhe o interpretador testando execução (`$PY`), não presença.
 Sem áudio até o dono liberar: TODOS em `run.sh` já exclui T3/T3b/T4.
