@@ -30,6 +30,7 @@ SEGREDO = "app-secret-fluxo"
 # teste vizinho.
 CLIENTE_GATILHO = "5511977770001"
 CLIENTE_CLIQUE = "5511977770002"
+CLIENTE_IMAGEM = "5511977770003"
 
 
 @pytest.fixture(autouse=True)
@@ -233,3 +234,23 @@ def test_cliente_que_volta_a_escrever_recebe_recado(client, db, loja_a, outbound
     assert any(
         kw.get("number") == CLIENTE_VOLTA for _tipo, kw in enviados
     ), "cliente falou sozinho: nenhum recado saiu"
+
+
+def test_imagem_do_cliente_vira_turno_do_agente(client, db, loja_a, outbound_fake):
+    """Spec §5.10: imagem entra sem OCR, mas o bot não cala (e2e T9).
+
+    Sem texto, o turno morria na guarda de `_processar_mensagem_cliente` e o
+    `mensagens[]` voltava vazio: entrada persistida, agente nunca chamado.
+    """
+    from app.main import TEXTO_IMAGEM_SEM_OCR
+
+    corpo = _inbound(loja_a["instance"], **{
+        "from": CLIENTE_IMAGEM, "id": "wamid.imagem1", "type": "image",
+        "image": {"id": "mid.imagem1", "mime_type": "image/jpeg"},
+    })
+    resposta = client.post("/webhook/cloud", content=corpo, headers=_assinar(corpo))
+    assert resposta.status_code == 200, resposta.text
+    mensagens = resposta.json()["mensagens"]
+    assert len(mensagens) == 1, "imagem caiu fora do fluxo do agente (bot mudo)"
+    assert mensagens[0]["tipo"] == "imagem"
+    assert mensagens[0]["texto"] == TEXTO_IMAGEM_SEM_OCR

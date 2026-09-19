@@ -43,6 +43,9 @@ for f in (
     print("FILA", f.ordem, f.nome, f.telefone, "ativo" if f.ativo else "inativo")
 db.close()
 PYFILA
-DATABASE_URL="$CHATBOT_DATABASE_URL" python /tmp/fila_dono.py
+# PYTHONPATH explicito: o script mora em /tmp, entao sys.path[0] e /tmp e o
+# `import app` falha mesmo depois do cd. (`python -m` do provisionar.sh nao
+# sofre disso porque o -m poe o cwd no caminho.)
+DATABASE_URL="$CHATBOT_DATABASE_URL" PYTHONPATH=/srv/chatbot python /tmp/fila_dono.py
 rm -f /tmp/fila_dono.py
 exit

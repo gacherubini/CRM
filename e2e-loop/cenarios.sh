@@ -137,9 +137,32 @@ T8_simulacao() { # jornada CPF -> nascimento -> CNH -> solicitacao enfileirada
   e2e_wait_reply "$t0" "$LOG_DIR/T8-4.txt" || { falhou T8 "bot mudo apos CNH"; return 1; }
   assert_contém "$LOG_DIR/T8-4.txt" "setor|encaminh|simula|vendedor" T8-fim "bot encaminha a simulacao" || return 1
   # Modo 2: nao ha alerta de grupo — a entrega ao vendedor E a oferta.
-  # 1) oferta aberta para este cliente; 2) rastro "oferta enviada" no log.
-  t_api T8-oferta "api_ofertas aberta" "$GABRIEL_DIGITS" "oferta aberta ao vendedor" || return 1
-  local ofid; ofid="$(python3 -c "
+  # 1) oferta aberta para este cliente (ou JA travada: o vendedor pode tocar
+  # em Peguei antes de o oraculo consultar); 2) SEM rastro de falha no log.
+  # Sonda sem t_api de proposito: veredito sai uma vez so, depois das duas
+  # sondas — senao o FALHOU da sonda `aberta` ficaria no placar mesmo com a
+  # oferta assumida.
+  local of_json="$LOG_DIR/api-T8-oferta.json"
+  api_ofertas aberta >"$of_json" 2>>"$LOG_DIR/api.err" || true
+  if grep -q "$GABRIEL_DIGITS" "$of_json" 2>/dev/null; then
+    passou T8-oferta "oferta aberta ao vendedor"
+  elif api_ofertas travada >"$LOG_DIR/api-T8-oferta-travada.json" 2>>"$LOG_DIR/api.err" \
+    && grep -q "$GABRIEL_DIGITS" "$LOG_DIR/api-T8-oferta-travada.json"; then
+    # Corrida com o dedo do vendedor (run 20260919-012044: travada 8s apos
+    # criada, 1s antes da consulta). Travada prova entrega + aceite; punir o
+    # dedo rapido seria vermelho falso. Pula direto para o reset de fim.
+    passou T8-oferta "oferta já assumida (vendedor mais rápido que o oráculo)"
+    passou T8-vendedor "entrega provada pelo Peguei"
+    passou T8-peguei "vendedor assumiu o lead"
+    t_reset T8-fim || return 1
+    return 0
+  else
+    if [ ! -s "$of_json" ]; then
+      falhou T8-oferta "oferta aberta ao vendedor (API sem resposta)"; return 1
+    fi
+    falhou T8-oferta "oferta aberta ao vendedor (sem '$GABRIEL_DIGITS')"; return 1
+  fi
+  local ofid; ofid="$("$PY" -c "
 import json
 d = json.load(open('$LOG_DIR/api-T8-oferta.json'))
 cands = [o for o in d if o.get('telefone_cliente', '').endswith('80336365')]
@@ -155,7 +178,15 @@ print(cands[0]['id'] if cands else '')
   if grep -q "falha ao enviar oferta" "$out" 2>/dev/null; then
     falhou T8-vendedor "oferta aberta mas WhatsApp ao vendedor falhou (template PENDING? janela fechada?)"; return 1
   fi
-  assert_contém "$out" "oferta enviada.*envelope=" T8-vendedor "vendedor chamado no WhatsApp" || return 1
+  # Sem assert no rastro de SUCESSO de proposito: ele loga em logger.info
+  # ("oferta enviada ... envelope=") e o root em producao e WARNING (uvicorn
+  # sem --log-level, sem basicConfig no codigo), entao a linha nunca chega ao
+  # fly logs — o assert nela era vermelho deterministico com o produto certo
+  # (19/09: oferta aberta + WhatsApp entregue, T8-envio.log vazio). A linha de
+  # FALHA e logger.exception (ERROR) e aparece; sem ela, a entrega e provada
+  # pelo passo seguinte — sem WhatsApp nao ha Peguei.
+  e2e_log "T8-vendedor: sem rastro de falha no envio"
+  passou T8-vendedor "envio sem falha (entrega provada pelo Peguei)"
   # O vendedor da vez e o MESMO aparelho do cliente (5551980336365, ordem 0 da
   # fila): a oferta cai no mesmo fio do WhatsApp. Reset aqui apagaria a oferta
   # antes do "Peguei" — espera o vendedor responder e so entao limpa.
