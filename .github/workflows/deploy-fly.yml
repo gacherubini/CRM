@@ -1,0 +1,200 @@
+# Merge na main sobe o Fly sozinho. Sem aprovacao manual, por decisao do dono.
+#
+# O que torna isso seguro e a ordem: guarda a imagem atual -> deploy -> smoke no
+# /healthz agregado -> se o smoke falhar, volta para a imagem guardada. O bundle
+# roda `alembic upgrade head` no boot em modo fail-fast, entao migration ruim
+# derruba o app; e exatamente esse caso que o rollback cobre.
+#
+# Deploy so por deploy/fly/3vm/ (AGENTS.md secao 5). Os fly.toml dentro da pasta
+# de cada produto apontam para os monolitos destruidos e nao se usam.
+name: Deploy Fly
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "chatbot-api/**"
+      - "motor-simulacao/**"
+      - "estoque-api/**"
+      - "portal-gestao/**"
+      - "revy-trafego/**"
+      - "catalogo-publico/**"
+      - "shared/**"
+      - "deploy/fly/3vm/**"
+      - ".github/workflows/deploy-fly.yml"
+  workflow_dispatch:
+    inputs:
+      alvo:
+        description: "O que subir"
+        type: choice
+        options: [auto, app, motor, ambos]
+        default: auto
+
+# Nunca dois deploys do mesmo app ao mesmo tempo. Sem cancel-in-progress: matar
+# um deploy no meio deixa a maquina em estado indefinido.
+concurrency:
+  group: deploy-fly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  APP: app2037
+  MOTOR: motor2037
+  HEALTH_URL: https://app2037.fly.dev/healthz
+
+jobs:
+  decidir:
+    name: decidir o que subir
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.f.outputs.app }}
+      motor: ${{ steps.f.outputs.motor }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - id: f
+        name: olhar o que mudou
+        run: |
+          set -euo pipefail
+          ALVO="${{ inputs.alvo || 'auto' }}"
+          case "$ALVO" in
+            app)    echo "app=true"  >> "$GITHUB_OUTPUT"; echo "motor=false" >> "$GITHUB_OUTPUT"; exit 0 ;;
+            motor)  echo "app=false" >> "$GITHUB_OUTPUT"; echo "motor=true"  >> "$GITHUB_OUTPUT"; exit 0 ;;
+            ambos)  echo "app=true"  >> "$GITHUB_OUTPUT"; echo "motor=true"  >> "$GITHUB_OUTPUT"; exit 0 ;;
+          esac
+          MUDOU=$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          echo "$MUDOU"
+          # O app2037 e um bundle: qualquer produto de aplicacao o reconstroi.
+          if echo "$MUDOU" | grep -qE '^(chatbot-api|motor-simulacao|estoque-api|portal-gestao|revy-trafego|catalogo-publico|shared|deploy/fly/3vm)/'; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "app=false" >> "$GITHUB_OUTPUT"
+          fi
+          # O motor2037 so muda quando o motor muda.
+          if echo "$MUDOU" | grep -qE '^(motor-simulacao|shared)/|^deploy/fly/3vm/(Dockerfile\.worker|fly\.worker\.toml|.*worker.*)'; then
+            echo "motor=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "motor=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  app:
+    name: app2037
+    needs: decidir
+    if: needs.decidir.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # `fly deploy` empacota a arvore local. No CI a arvore e o commit da main,
+      # o que fecha o buraco de deployar da maquina com mudanca nao commitada.
+      - name: guardar a imagem que esta no ar
+        id: antes
+        run: |
+          set -euo pipefail
+          flyctl image show --app "$APP" --json > antes.json || echo '{}' > antes.json
+          REF=$(jq -r '.. | objects | (.Ref // .ref // empty)' antes.json | head -1)
+          if [ -z "$REF" ] || [ "$REF" = "null" ]; then
+            echo "::warning::nao consegui ler a imagem atual; ROLLBACK AUTOMATICO INDISPONIVEL nesta rodada"
+            echo "ref=" >> "$GITHUB_OUTPUT"
+          else
+            echo "imagem atual: $REF"
+            echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: deploy
+        run: flyctl deploy . --app "$APP" --config deploy/fly/3vm/fly.app.toml --ha=false --wait-timeout 600
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # grace_period do health check e 180s no fly.app.toml; damos folga.
+      - name: smoke no healthz agregado
+        id: smoke
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          for i in $(seq 1 40); do
+            CODE=$(curl -s -o /tmp/h.txt -w '%{http_code}' --max-time 15 "$HEALTH_URL" || echo 000)
+            echo "tentativa $i: HTTP $CODE"
+            if [ "$CODE" = "200" ]; then
+              cat /tmp/h.txt
+              echo "ok=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::healthz nao voltou 200 em ~7min"
+          cat /tmp/h.txt || true
+          echo "ok=false" >> "$GITHUB_OUTPUT"
+          exit 1
+
+      - name: rollback para a imagem anterior
+        if: steps.smoke.outputs.ok != 'true'
+        run: |
+          set -euo pipefail
+          REF="${{ steps.antes.outputs.ref }}"
+          if [ -z "$REF" ]; then
+            echo "::error::smoke falhou e nao ha imagem guardada. Rollback na mao:"
+            echo "  flyctl releases --app $APP"
+            echo "  flyctl deploy --app $APP --image <ref-anterior> --strategy immediate"
+            exit 1
+          fi
+          echo "voltando para $REF"
+          flyctl deploy --app "$APP" --image "$REF" --strategy immediate --ha=false --wait-timeout 600
+          echo "::error::deploy revertido para $REF. O commit ${{ github.sha }} NAO esta no ar."
+          exit 1
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: resumo
+        if: always()
+        run: |
+          {
+            echo "### app2037"
+            echo ""
+            echo "- commit: \`${{ github.sha }}\`"
+            echo "- smoke: \`${{ steps.smoke.outcome }}\`"
+            echo "- imagem anterior: \`${{ steps.antes.outputs.ref || 'nao capturada' }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  motor:
+    name: motor2037
+    needs: decidir
+    if: needs.decidir.outputs.motor == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: deploy do worker
+        run: flyctl deploy . --app "$MOTOR" --config deploy/fly/3vm/fly.worker.toml --ha=false --wait-timeout 600
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      # As machines por banco (motor-worker-bradesco, -pan, ...) nao sao tocadas
+      # por `fly deploy`: elas sao machines avulsas. Atualizar sozinho aqui
+      # significaria mexer em machine sem supervisao, entao so avisa.
+      - name: lembrete dos workers por banco
+        run: |
+          {
+            echo "### motor2037"
+            echo ""
+            echo "- commit: \`${{ github.sha }}\`"
+            echo ""
+            echo "> Os workers por banco **nao** pegaram este deploy."
+            echo "> Para atualizar cada um:"
+            echo '> ```'
+            echo "> flyctl machine list --app $MOTOR"
+            echo "> flyctl machine update <id> --app $MOTOR --image <imagem-nova> --yes"
+            echo '> ```'
+          } >> "$GITHUB_STEP_SUMMARY"
