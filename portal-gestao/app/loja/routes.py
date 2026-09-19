@@ -5,12 +5,14 @@ Rotas legadas ``/app/leads`` e ``/app/conversas`` permanecem intactas.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -42,9 +44,15 @@ from app.loja.attendance import (
     visivel_para_usuario,
     atribuicao_para_telefone,
 )
+from app.loja.audio_media import (
+    AudioMediaNaoEncontrada,
+    AudioMediaPort,
+    get_audio_media_port,
+)
 from app.loja.human_messaging import (
     HumanMessagingPort,
     MensagemHumanaErro,
+    MensagemHumanaLojaNaoOperacional,
     MensagemHumanaNaoEncontrada,
     MensagemHumanaNaoAutorizada,
 )
@@ -544,6 +552,15 @@ def atendimento_workspace(
     pode_papel = usuario.papel in _PAPEIS_MUTACAO_ATENDIMENTO
     pode_enviar = pode_papel and not workspace.envio_bloqueado_canal
     pode_atualizar_etapa = pode_papel and bool(lead and lead.get("id"))
+    # Áudio só com a flag ligada, Loja Modo 2 e janela de atendimento aberta —
+    # checado antes de habilitar o microfone, não depois de gravar.
+    audio_habilitado = bool(settings.revy_loja_audio_enabled)
+    audio_motivo = (
+        _motivo_audio_indisponivel(workspace, mensagens)
+        if (pode_enviar and audio_habilitado)
+        else None
+    )
+    pode_audio = pode_enviar and audio_habilitado and audio_motivo is None
 
     return templates.TemplateResponse(
         "loja/atendimento_workspace.html",
@@ -556,6 +573,9 @@ def atendimento_workspace(
             AttendanceState=AttendanceState,
             atendimento_enabled=True,
             pode_enviar=pode_enviar,
+            pode_audio=pode_audio,
+            audio_motivo=audio_motivo,
+            audio_max_duracao=settings.audio_max_duration_seconds,
             pode_handoff=pode_papel,
             pode_atualizar_etapa=pode_atualizar_etapa,
             canal_id_filtro=canal_id or workspace.canal_id,
@@ -604,6 +624,58 @@ def _append_query(destino: str, **params: str) -> str:
         return destino
     sep = "&" if "?" in destino else "?"
     return f"{destino}{sep}{'&'.join(partes)}"
+
+
+_AUDIO_JANELA_HORAS = 24
+
+
+def _parse_iso(valor: object) -> datetime | None:
+    if not valor:
+        return None
+    texto = str(valor).strip().replace("Z", "+00:00")
+    try:
+        dt = datetime.fromisoformat(texto)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _parse_float(valor: object) -> float | None:
+    if valor in (None, ""):
+        return None
+    try:
+        return float(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+def _janela_atendimento_aberta(mensagens) -> bool:
+    """Cloud só deixa mensagem livre dentro de 24h da última entrada do cliente."""
+    ultima = None
+    for m in mensagens or []:
+        if m.get("direcao") != "entrada":
+            continue
+        ts = _parse_iso(m.get("criada_em"))
+        if ts is not None and (ultima is None or ts > ultima):
+            ultima = ts
+    if ultima is None:
+        return False
+    return datetime.now(timezone.utc) - ultima <= timedelta(hours=_AUDIO_JANELA_HORAS)
+
+
+def _motivo_audio_indisponivel(workspace, mensagens) -> str | None:
+    """Motivo pelo qual o microfone não aparece; None quando pode gravar."""
+    estado = str(getattr(workspace, "canal_estado", "") or "")
+    if not estado.startswith("cloud"):
+        return "Áudio disponível só na central Cloud API (Modo 2)."
+    if not _janela_atendimento_aberta(mensagens):
+        return (
+            "Janela de 24h fechada: até o cliente responder, "
+            "só vai template de texto."
+        )
+    return None
 
 
 def _quer_json(request: Request) -> bool:
@@ -664,6 +736,87 @@ def _guard_workspace_mutacao(
             None,
         )
     return None, atr
+
+
+@dataclass
+class _ContextoEnvioAtendimento:
+    """Estado validado de uma rota de envio do Atendimento."""
+
+    usuario: Usuario
+    telefone: str
+    form: Any
+    canal_id_form: str | None
+    destino: str
+    quer_json: bool
+
+
+async def _preparar_envio_atendimento(
+    request: Request,
+    db: Session,
+    workspace_id: str,
+):
+    """Login / flag / papel / escopo / CSRF + form: guarda comum das rotas de envio.
+
+    Devolve ``(ctx, None)`` quando pode enviar, ou ``(None, resposta)`` quando a
+    rota deve parar. Preserva o duplo contrato: HTML (redirect/erro) e JSON.
+    """
+    quer_json = _quer_json(request)
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        if quer_json:
+            return None, _json_erro(401, "auth", "Não autenticado")
+        return None, redirecionar_login()
+    if not atendimento_habilitado():
+        if quer_json:
+            return None, _json_erro(404, "flag", "Atendimento não habilitado")
+        return None, _flag_off_response(request, usuario)
+    if not pode_usar_atendimento(usuario):
+        if quer_json:
+            return None, _json_erro(403, "perm", "Sem permissão")
+        return None, templates.TemplateResponse(
+            "erro.html",
+            contexto(request, usuario, erro="Sem permissão para o Atendimento."),
+            status_code=403,
+        )
+
+    telefone = normalizar_telefone(workspace_id)
+    form = await request.form()
+    # canal_id do form (hidden) — só o da conversa aberta, nunca seletor livre.
+    # Ignora instance/canal arbitrário do cliente: nunca confiar em seletor UI.
+    canal_id_form = (form.get("canal_id") or "").strip() or None
+    destino = f"/app/loja/atendimento/{telefone}"
+    if canal_id_form:
+        destino = f"{destino}?canal_id={canal_id_form}"
+
+    if not csrf_valido(request, form.get("csrf")):
+        if quer_json:
+            return None, _json_erro(403, "sessao", "Sessão expirada")
+        return None, RedirectResponse(
+            _append_query(destino, erro="sessao"), status_code=303
+        )
+
+    atribuicoes = carregar_atribuicoes_ativas(db, usuario.loja_slug)
+    atr = atribuicao_para_telefone(atribuicoes, telefone)
+    if not visivel_para_usuario(usuario, atribuicao=atr):
+        if quer_json:
+            return None, _json_erro(403, "scope", "Atendimento fora do seu escopo")
+        return None, templates.TemplateResponse(
+            "erro.html",
+            contexto(request, usuario, erro="Atendimento fora do seu escopo."),
+            status_code=403,
+        )
+
+    return (
+        _ContextoEnvioAtendimento(
+            usuario=usuario,
+            telefone=telefone,
+            form=form,
+            canal_id_form=canal_id_form,
+            destino=destino,
+            quer_json=quer_json,
+        ),
+        None,
+    )
 
 
 @router.get("/app/loja/atendimento/{workspace_id}/mensagens.json")
@@ -783,59 +936,20 @@ async def atendimento_enviar_mensagem(
     chatbot: ChatbotClient = Depends(get_chatbot_client),
     messaging: HumanMessagingPort = Depends(get_human_messaging_port),
 ):
-    quer_json = _quer_json(request)
-    usuario = usuario_atual(request, db)
-    if not usuario:
-        if quer_json:
-            return _json_erro(401, "auth", "Não autenticado")
-        return redirecionar_login()
-    if not atendimento_habilitado():
-        if quer_json:
-            return _json_erro(404, "flag", "Atendimento não habilitado")
-        return _flag_off_response(request, usuario)
-    if not pode_usar_atendimento(usuario):
-        if quer_json:
-            return _json_erro(403, "perm", "Sem permissão")
-        return templates.TemplateResponse(
-            "erro.html",
-            contexto(request, usuario, erro="Sem permissão para o Atendimento."),
-            status_code=403,
-        )
-
-    telefone = normalizar_telefone(workspace_id)
-    form = await request.form()
-    # canal_id do form (hidden) — só o da conversa aberta, nunca seletor livre.
-    canal_id_form = (form.get("canal_id") or "").strip() or None
-    # Ignora instance/canal arbitrário do cliente: nunca confiar em seletor UI.
-    # Canal vem só do resumo da conversa no servidor.
-    destino = f"/app/loja/atendimento/{telefone}"
-    if canal_id_form:
-        destino = f"{destino}?canal_id={canal_id_form}"
+    ctx, erro = await _preparar_envio_atendimento(request, db, workspace_id)
+    if erro is not None:
+        return erro
+    usuario = ctx.usuario
+    telefone = ctx.telefone
+    form = ctx.form
+    canal_id_form = ctx.canal_id_form
+    destino = ctx.destino
+    quer_json = ctx.quer_json
 
     def _redir_erro(code: str):
         if quer_json:
             return _json_erro(400, code, code)
-        sep = "&" if "?" in destino else "?"
-        return RedirectResponse(f"{destino}{sep}erro={code}", status_code=303)
-
-    if not csrf_valido(request, form.get("csrf")):
-        if quer_json:
-            return _json_erro(403, "sessao", "Sessão expirada")
-        return RedirectResponse(
-            f"{destino}&erro=sessao" if "?" in destino else f"{destino}?erro=sessao",
-            status_code=303,
-        )
-
-    atribuicoes = carregar_atribuicoes_ativas(db, usuario.loja_slug)
-    atr = atribuicao_para_telefone(atribuicoes, telefone)
-    if not visivel_para_usuario(usuario, atribuicao=atr):
-        if quer_json:
-            return _json_erro(403, "scope", "Atendimento fora do seu escopo")
-        return templates.TemplateResponse(
-            "erro.html",
-            contexto(request, usuario, erro="Atendimento fora do seu escopo."),
-            status_code=403,
-        )
+        return RedirectResponse(_append_query(destino, erro=code), status_code=303)
 
     texto = (form.get("texto") or "").strip()
     if not texto:
@@ -933,6 +1047,220 @@ async def atendimento_enviar_mensagem(
     sufixo = "duplicada" if resultado.duplicada else "enviada"
     sep = "&" if "?" in destino else "?"
     return RedirectResponse(f"{destino}{sep}ok={sufixo}", status_code=303)
+
+
+@router.post("/app/loja/atendimento/{workspace_id}/audio")
+async def atendimento_enviar_audio(
+    request: Request,
+    workspace_id: str,
+    db: Session = Depends(get_db),
+    chatbot: ChatbotClient = Depends(get_chatbot_client),
+    messaging: HumanMessagingPort = Depends(get_human_messaging_port),
+):
+    """Áudio do Vendedor: multipart ao Chatbot. Só Modo 2 (o mic já é oculto fora)."""
+    ctx, erro = await _preparar_envio_atendimento(request, db, workspace_id)
+    if erro is not None:
+        return erro
+    usuario = ctx.usuario
+    telefone = ctx.telefone
+    form = ctx.form
+    canal_id_form = ctx.canal_id_form
+    destino = ctx.destino
+    quer_json = ctx.quer_json
+
+    def _erro(status: int, code: str, message: str):
+        if quer_json:
+            return _json_erro(status, code, message)
+        return RedirectResponse(_append_query(destino, erro=code), status_code=303)
+
+    if not settings.revy_loja_audio_enabled:
+        return _json_erro(404, "flag", "Áudio não habilitado")
+
+    arquivo = form.get("arquivo")
+    if arquivo is None or not hasattr(arquivo, "read"):
+        return _erro(400, "audio", "Áudio ausente")
+    conteudo = await arquivo.read(settings.audio_max_bytes + 1)
+    if not conteudo:
+        return _erro(400, "audio", "Áudio vazio")
+    if len(conteudo) > settings.audio_max_bytes:
+        return _erro(413, "audio_grande", "Áudio acima do limite permitido")
+    duracao = _parse_float(form.get("duracao_segundos"))
+    if duracao is not None and duracao > settings.audio_max_duration_seconds:
+        return _erro(422, "audio_longo", "Áudio acima do tempo permitido")
+
+    conversa_resumo, conversa_mensagens, _ = _conversa_por_telefone(
+        chatbot, telefone, canal_id=canal_id_form
+    )
+    if conversa_resumo and not canal_permite_envio(
+        canal_ativo=conversa_resumo.get("canal_ativo"),
+        canal_estado=conversa_resumo.get("canal_estado"),
+    ):
+        return _erro(423, "canal", "Canal inativo ou desconectado")
+    # ADR-0002: a janela vale no envio, não só na renderização do microfone.
+    if not _janela_atendimento_aberta(conversa_mensagens):
+        return _erro(422, "janela", "Janela de 24h fechada para áudio")
+
+    instance_conversa = None
+    if conversa_resumo:
+        instance_conversa = (
+            conversa_resumo.get("evolution_instance")
+            or conversa_resumo.get("instance")
+        )
+
+    idem = (form.get("idempotency_key") or "").strip()
+    if not idem or len(idem) > 120:
+        idem = f"portal:{usuario.loja_slug}:{telefone}:{uuid4().hex}"
+
+    mime = getattr(arquivo, "content_type", None) or "audio/webm"
+    filename = getattr(arquivo, "filename", None) or "voz.webm"
+
+    try:
+        resultado = messaging.enviar_audio(
+            telefone,
+            conteudo,
+            idempotency_key=idem,
+            filename=filename,
+            mime=mime,
+            duracao_segundos=duracao,
+            instance=instance_conversa,
+            ator=usuario.email,
+        )
+    except MensagemHumanaNaoEncontrada:
+        return _erro(404, "conversa", "Conversa não encontrada")
+    except MensagemHumanaNaoAutorizada:
+        return _erro(403, "perm", "Envio não autorizado")
+    except MensagemHumanaLojaNaoOperacional:
+        return _erro(423, "loja", "Loja não operacional")
+    except MensagemHumanaErro as exc:
+        return _erro(422, "audio", str(exc) or "Áudio recusado")
+    except ChatbotIndisponivel:
+        return _erro(503, "envio", "Não foi possível enviar o áudio agora")
+
+    criada_em = datetime.now(timezone.utc).isoformat()
+    msg_id = resultado.mensagem_id
+    if hasattr(chatbot, "mensagens") and isinstance(getattr(chatbot, "mensagens"), dict):
+        hist = chatbot.mensagens.setdefault(telefone, [])
+        if not resultado.duplicada:
+            hist.append(
+                {
+                    "id": msg_id,
+                    "direcao": "saida",
+                    "texto": "",
+                    "tipo": "audio",
+                    "criada_em": criada_em,
+                    "humana": True,
+                }
+            )
+        if hasattr(chatbot, "estados"):
+            chatbot.estados[telefone] = {"bot_ativo": False, "status": "handoff"}
+
+    if quer_json:
+        return JSONResponse(
+            {
+                "ok": True,
+                "duplicada": bool(resultado.duplicada),
+                "bot_ativo": bool(resultado.bot_ativo),
+                "mensagem": {
+                    "id": msg_id,
+                    "direcao": "saida",
+                    "texto": "",
+                    "tipo": "audio",
+                    "criada_em": criada_em,
+                },
+            }
+        )
+
+    sufixo = "duplicada" if resultado.duplicada else "enviada"
+    return RedirectResponse(_append_query(destino, ok=sufixo), status_code=303)
+
+
+@router.get("/app/loja/atendimento/{workspace_id}/audio/{mensagem_id}")
+def atendimento_audio_midia(
+    request: Request,
+    workspace_id: str,
+    mensagem_id: str,
+    db: Session = Depends(get_db),
+    media: AudioMediaPort = Depends(get_audio_media_port),
+):
+    """Proxy autenticado do áudio de uma mensagem; repassa Range do player."""
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return _json_erro(401, "auth", "Não autenticado")
+    if not atendimento_habilitado():
+        return _json_erro(404, "flag", "Atendimento não habilitado")
+    if not pode_usar_atendimento(usuario):
+        return _json_erro(403, "perm", "Sem permissão")
+
+    telefone = normalizar_telefone(workspace_id)
+    if not telefone:
+        return _json_erro(404, "not_found", "Atendimento não encontrado")
+
+    atribuicoes = carregar_atribuicoes_ativas(db, usuario.loja_slug)
+    atr = atribuicao_para_telefone(atribuicoes, telefone)
+    if not visivel_para_usuario(usuario, atribuicao=atr):
+        return _json_erro(403, "scope", "Atendimento fora do seu escopo")
+
+    if not settings.revy_loja_audio_enabled:
+        return _json_erro(404, "flag", "Áudio não habilitado")
+
+    try:
+        midia = media.baixar(
+            telefone, mensagem_id, range_header=request.headers.get("range")
+        )
+    except AudioMediaNaoEncontrada:
+        return _json_erro(404, "midia", "Áudio não encontrado")
+    except ChatbotIndisponivel:
+        return _json_erro(503, "integracao", "Não foi possível carregar o áudio agora")
+
+    headers = {"Accept-Ranges": "bytes", "Cache-Control": "private, max-age=300"}
+    if midia.content_range:
+        headers["Content-Range"] = midia.content_range
+    return Response(
+        content=midia.content,
+        status_code=midia.status,
+        media_type=midia.media_type,
+        headers=headers,
+    )
+
+
+@router.post("/app/loja/atendimento/{workspace_id}/audio/{mensagem_id}/transcrever")
+def atendimento_transcrever_audio(
+    request: Request,
+    workspace_id: str,
+    mensagem_id: str,
+    db: Session = Depends(get_db),
+    media: AudioMediaPort = Depends(get_audio_media_port),
+):
+    """Transcrição sob demanda de um áudio, via Chatbot (mesmo Whisper do inbound)."""
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return _json_erro(401, "auth", "Não autenticado")
+    if not atendimento_habilitado():
+        return _json_erro(404, "flag", "Atendimento não habilitado")
+    if not pode_usar_atendimento(usuario):
+        return _json_erro(403, "perm", "Sem permissão")
+
+    telefone = normalizar_telefone(workspace_id)
+    if not telefone:
+        return _json_erro(404, "not_found", "Atendimento não encontrado")
+
+    atribuicoes = carregar_atribuicoes_ativas(db, usuario.loja_slug)
+    atr = atribuicao_para_telefone(atribuicoes, telefone)
+    if not visivel_para_usuario(usuario, atribuicao=atr):
+        return _json_erro(403, "scope", "Atendimento fora do seu escopo")
+
+    if not settings.revy_loja_audio_enabled:
+        return _json_erro(404, "flag", "Áudio não habilitado")
+
+    try:
+        texto = media.transcrever(telefone, mensagem_id)
+    except AudioMediaNaoEncontrada:
+        return _json_erro(404, "midia", "Áudio não encontrado")
+    except ChatbotIndisponivel:
+        return _json_erro(
+            503, "transcricao", "Não foi possível transcrever o áudio agora"
+        )
+    return JSONResponse({"ok": True, "transcricao": texto})
 
 
 @router.post("/app/loja/atendimento/{workspace_id}/handoff")

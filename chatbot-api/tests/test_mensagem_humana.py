@@ -87,6 +87,9 @@ def test_mensagem_humana_idempotente_nao_reenvia_evolution(
     assert r1.json()["duplicada"] is False
     assert r2.json()["duplicada"] is True
     assert r1.json()["mensagem_id"] == r2.json()["mensagem_id"]
+    # Contrato do texto intacto: campos de áudio não vazam para a resposta do texto.
+    assert "tipo" not in r2.json()
+    assert "media_ref" not in r2.json()
 
     # Uma única chamada Evolution (segunda é dedupe por provider_message_id).
     assert len(_fake_whatsapp_outbound.calls) == 1
