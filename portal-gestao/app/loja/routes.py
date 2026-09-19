@@ -12,7 +12,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -43,6 +43,11 @@ from app.loja.attendance import (
     unificar_lista,
     visivel_para_usuario,
     atribuicao_para_telefone,
+)
+from app.loja.audio_media import (
+    AudioMediaNaoEncontrada,
+    AudioMediaPort,
+    get_audio_media_port,
 )
 from app.loja.human_messaging import (
     HumanMessagingPort,
@@ -1153,6 +1158,52 @@ async def atendimento_enviar_audio(
 
     sufixo = "duplicada" if resultado.duplicada else "enviada"
     return RedirectResponse(_append_query(destino, ok=sufixo), status_code=303)
+
+
+@router.get("/app/loja/atendimento/{workspace_id}/audio/{mensagem_id}")
+def atendimento_audio_midia(
+    request: Request,
+    workspace_id: str,
+    mensagem_id: str,
+    db: Session = Depends(get_db),
+    media: AudioMediaPort = Depends(get_audio_media_port),
+):
+    """Proxy autenticado do áudio de uma mensagem; repassa Range do player."""
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return _json_erro(401, "auth", "Não autenticado")
+    if not atendimento_habilitado():
+        return _json_erro(404, "flag", "Atendimento não habilitado")
+    if not pode_usar_atendimento(usuario):
+        return _json_erro(403, "perm", "Sem permissão")
+
+    telefone = normalizar_telefone(workspace_id)
+    if not telefone:
+        return _json_erro(404, "not_found", "Atendimento não encontrado")
+
+    atribuicoes = carregar_atribuicoes_ativas(db, usuario.loja_slug)
+    atr = atribuicao_para_telefone(atribuicoes, telefone)
+    if not visivel_para_usuario(usuario, atribuicao=atr):
+        return _json_erro(403, "scope", "Atendimento fora do seu escopo")
+
+    try:
+        midia = media.baixar(
+            telefone, mensagem_id, range_header=request.headers.get("range")
+        )
+    except AudioMediaNaoEncontrada:
+        return _json_erro(404, "midia", "Áudio não encontrado")
+    except ChatbotIndisponivel:
+        return _json_erro(503, "integracao", "Não foi possível carregar o áudio agora")
+
+    headers = {"Accept-Ranges": "bytes", "Cache-Control": "private, max-age=300"}
+    if midia.content_range:
+        headers["Content-Range"] = midia.content_range
+    return Response(
+        content=midia.content,
+        status_code=midia.status,
+        media_type=midia.media_type,
+        headers=headers,
+    )
 
 
 @router.post("/app/loja/atendimento/{workspace_id}/handoff")

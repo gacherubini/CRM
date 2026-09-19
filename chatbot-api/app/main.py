@@ -1162,6 +1162,32 @@ async def enviar_audio_humano(
     )
 
 
+@app.get("/v1/conversas/{telefone}/mensagens/{mensagem_id}/midia")
+def baixar_midia_humana(
+    telefone: str,
+    mensagem_id: str,
+    request: Request,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+    media: AudioMediaPort = Depends(get_audio_media_port),
+):
+    """Serve o áudio de uma mensagem da própria Loja, com requisição parcial.
+
+    A loja vem do token de serviço; ``telefone`` fica no caminho por simetria com
+    o envio, e o escopo real é a mensagem (id + loja).
+    """
+    status, headers, corpo, mime = servico.baixar_midia_humana(
+        db,
+        ctx.loja_id,
+        mensagem_id,
+        range_header=request.headers.get("range"),
+        media=media,
+    )
+    return Response(
+        content=corpo, status_code=status, headers=headers, media_type=mime
+    )
+
+
 @app.post("/v1/consentimentos", status_code=201)
 def registrar_consentimento(
     dados: ConsentimentoInput,

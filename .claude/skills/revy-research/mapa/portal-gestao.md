@@ -1,23 +1,24 @@
-# portal-gestao · 182 rotas · 26 modelos · 6 workers · 37 flags · 27 migrations · 63 templates
+# portal-gestao · 183 rotas · 26 modelos · 6 workers · 37 flags · 27 migrations · 63 templates
 
-Gerado de `2563e8b`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `7b72320`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0027_perfil_avatar_foto`
 
 ## Rotas
 
-- `GET /app/loja/atendimento` — app/loja/routes.py:193
-- `GET /app/loja/agente` — app/loja/routes.py:409
-- `GET /app/loja/atendimento/{workspace_id}` — app/loja/routes.py:460
-- `GET /app/loja/atendimento/{workspace_id}/mensagens.json` — app/loja/routes.py:811
-- `POST /app/loja/atendimento/{workspace_id}/mensagem` — app/loja/routes.py:920
-- `POST /app/loja/atendimento/{workspace_id}/audio` — app/loja/routes.py:1041
-- `POST /app/loja/atendimento/{workspace_id}/handoff` — app/loja/routes.py:1158
-- `POST /app/loja/atendimento/{workspace_id}/etapa` — app/loja/routes.py:1237
-- `GET /app/loja/agente/configuracao` — app/loja/routes.py:1383
-- `PUT /app/loja/agente/configuracao.json` — app/loja/routes.py:1413
-- `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1454
-- `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1497
-- `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1519
+- `GET /app/loja/atendimento` — app/loja/routes.py:198
+- `GET /app/loja/agente` — app/loja/routes.py:414
+- `GET /app/loja/atendimento/{workspace_id}` — app/loja/routes.py:465
+- `GET /app/loja/atendimento/{workspace_id}/mensagens.json` — app/loja/routes.py:816
+- `POST /app/loja/atendimento/{workspace_id}/mensagem` — app/loja/routes.py:925
+- `POST /app/loja/atendimento/{workspace_id}/audio` — app/loja/routes.py:1046
+- `GET /app/loja/atendimento/{workspace_id}/audio/{mensagem_id}` — app/loja/routes.py:1163
+- `POST /app/loja/atendimento/{workspace_id}/handoff` — app/loja/routes.py:1209
+- `POST /app/loja/atendimento/{workspace_id}/etapa` — app/loja/routes.py:1288
+- `GET /app/loja/agente/configuracao` — app/loja/routes.py:1434
+- `PUT /app/loja/agente/configuracao.json` — app/loja/routes.py:1464
+- `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1505
+- `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1548
+- `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1570
 - `GET /health/live` — app/main.py:583
 - `GET /health/ready` — app/main.py:588
 - `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:597
@@ -298,11 +299,11 @@ Migration head: `0027_perfil_avatar_foto`
 
 ## Templates
 
-- `app/templates/erro.html` — app/loja/routes.py:112
-- `app/templates/loja/atendimento_lista.html` — app/loja/routes.py:279
-- `app/templates/loja/agente.html` — app/loja/routes.py:438
-- `app/templates/loja/atendimento_workspace.html` — app/loja/routes.py:555
-- `app/templates/loja/agente_configuracao.html` — app/loja/routes.py:1401
+- `app/templates/erro.html` — app/loja/routes.py:117
+- `app/templates/loja/atendimento_lista.html` — app/loja/routes.py:284
+- `app/templates/loja/agente.html` — app/loja/routes.py:443
+- `app/templates/loja/atendimento_workspace.html` — app/loja/routes.py:560
+- `app/templates/loja/agente_configuracao.html` — app/loja/routes.py:1452
 - `app/templates/login.html` — app/main.py:641
 - `app/templates/dashboard.html` — app/main.py:828
 - `app/templates/estoque/lista.html` — app/main.py:872

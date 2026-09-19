@@ -9,6 +9,7 @@ from conftest import csrf_da_resposta, login
 
 from app.config import settings as portal_settings
 from app.loja import routes as loja_routes
+from app.loja.audio_media import AudioMediaNaoEncontrada, AudioMidia
 from app.loja.human_messaging import InMemoryHumanMessagingPort
 from app.main import app
 
@@ -113,6 +114,95 @@ def test_audio_fora_de_escopo_403(
 
     assert r.status_code == 403
     assert messaging_fake.enviadas == []
+
+
+class _MediaFake:
+    def __init__(self):
+        self.chamadas = []
+
+    def baixar(self, telefone, mensagem_id, *, range_header=None):
+        self.chamadas.append(
+            {"telefone": telefone, "mensagem_id": mensagem_id, "range": range_header}
+        )
+        if mensagem_id == "sumiu":
+            raise AudioMediaNaoEncontrada("áudio não encontrado")
+        if range_header:
+            return AudioMidia(
+                status=206,
+                content=b"OG",
+                media_type="audio/ogg",
+                content_range="bytes 0-1/6",
+            )
+        return AudioMidia(status=200, content=b"OGG123", media_type="audio/ogg")
+
+
+@pytest.fixture
+def media_fake(atendimento_on):
+    fake = _MediaFake()
+    app.dependency_overrides[loja_routes.get_audio_media_port] = lambda: fake
+    yield fake
+    app.dependency_overrides.pop(loja_routes.get_audio_media_port, None)
+
+
+def test_proxy_midia_entrega_bytes(client, chatbot_fake, media_fake):
+    login(client)
+    r = client.get(f"/app/loja/atendimento/{TELEFONE}/audio/msg-1")
+
+    assert r.status_code == 200
+    assert r.content == b"OGG123"
+    assert r.headers["accept-ranges"] == "bytes"
+    assert media_fake.chamadas[0]["mensagem_id"] == "msg-1"
+
+
+def test_proxy_midia_repassa_range(client, chatbot_fake, media_fake):
+    login(client)
+    r = client.get(
+        f"/app/loja/atendimento/{TELEFONE}/audio/msg-1",
+        headers={"Range": "bytes=0-1"},
+    )
+
+    assert r.status_code == 206
+    assert r.content == b"OG"
+    assert r.headers["content-range"] == "bytes 0-1/6"
+    assert media_fake.chamadas[0]["range"] == "bytes=0-1"
+
+
+def test_proxy_midia_inexistente_404(client, chatbot_fake, media_fake):
+    login(client)
+    r = client.get(f"/app/loja/atendimento/{TELEFONE}/audio/sumiu")
+
+    assert r.status_code == 404
+
+
+def test_proxy_midia_fora_escopo_403(client, chatbot_fake, media_fake, db):
+    from app.financeiro_calc import identidade_telefone
+    from app.models import AtendimentoAtribuicao, agora
+
+    db.add(
+        AtendimentoAtribuicao(
+            loja_slug="loja-teste",
+            telefone_hmac=identidade_telefone(TELEFONE),
+            vendedor_email="outro@loja.test",
+            origem="handoff_portal",
+            iniciada_em=agora(),
+            ativa=True,
+        )
+    )
+    db.commit()
+
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    r = client.get(f"/app/loja/atendimento/{TELEFONE}/audio/msg-1")
+
+    assert r.status_code == 403
+    assert media_fake.chamadas == []
+
+
+def test_proxy_midia_sem_login_401(client, chatbot_fake, media_fake):
+    r = client.get(
+        f"/app/loja/atendimento/{TELEFONE}/audio/msg-1",
+        headers={"Accept": "application/json"},
+    )
+    assert r.status_code == 401
 
 
 def test_workspace_esconde_mic_fora_do_modo2(client, chatbot_fake, atendimento_on):

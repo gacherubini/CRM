@@ -1,6 +1,6 @@
-# chatbot-api · 65 rotas · 19 modelos · 4 workers · 4 flags · 29 migrations
+# chatbot-api · 66 rotas · 19 modelos · 4 workers · 4 flags · 29 migrations
 
-Gerado de `2563e8b`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `7b72320`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0029_mensagem_audio`
 
 ## Rotas
@@ -21,55 +21,56 @@ Migration head: `0029_mensagem_audio`
 - `PATCH /v1/conversas/{telefone}/estado` — app/main.py:1035
 - `POST /v1/conversas/{telefone}/mensagens` — app/main.py:1098
 - `POST /v1/conversas/{telefone}/audios` — app/main.py:1123
-- `POST /v1/consentimentos` — app/main.py:1165
-- `POST /v1/leads` — app/main.py:1178
-- `POST /v1/integracoes/catalogo/interesses` — app/main.py:1189
-- `GET /v1/leads` — app/main.py:1223
-- `GET /v1/funil/eventos` — app/main.py:1233
-- `GET /v1/auditoria/ctwa` — app/main.py:1252
-- `GET /v1/atendimento/resumo` — app/main.py:1304
-- `GET /v1/leads.csv` — app/main.py:1316
-- `GET /v1/leads/{lead_id}` — app/main.py:1362
-- `PATCH /v1/leads/{lead_id}/etapa` — app/main.py:1369
-- `GET /v1/config/catalogo-bot` — app/main.py:1381
-- `GET /v1/agente/config` — app/main.py:1426
-- `GET /v1/agente/rascunho` — app/main.py:1476
-- `PUT /v1/agente/rascunho` — app/main.py:1487
-- `POST /v1/agente/publicar` — app/main.py:1502
-- `POST /v1/agente/preview` — app/main.py:1529
-- `GET /v1/agente/versoes` — app/main.py:1586
-- `POST /v1/agente/versoes/{versao_id}/restaurar` — app/main.py:1606
-- `GET /v1/estoque/buscar` — app/main.py:1624
-- `GET /v1/estoque/por-placa/{placa}` — app/main.py:1650
-- `GET /v1/estoque/veiculos/{veiculo_id}/midia-principal` — app/main.py:1667
-- `POST /v1/internal/provisioning/state` — app/main.py:1755
-- `POST /v1/simulacoes/solicitar` — app/main.py:1776
-- `POST /v1/simular` — app/main.py:1815
-- `GET /v1/whatsapp/canais` — app/main.py:1882
-- `POST /v1/whatsapp/canais` — app/main.py:1894
-- `POST /v1/whatsapp/canais/cloud/onboarding` — app/main.py:1922
-- `POST /v1/whatsapp/canais/{canal_id}/principal-estoque` — app/main.py:1966
-- `POST /v1/whatsapp/canais/{canal_id}/inativar` — app/main.py:1976
-- `POST /v1/whatsapp/canais/{canal_id}/connect` — app/main.py:1986
-- `GET /v1/whatsapp/canais/{canal_id}/status` — app/main.py:2003
-- `POST /v1/whatsapp/canais/{canal_id}/disconnect` — app/main.py:2013
-- `GET /v1/fila-vendedores` — app/main.py:2045
-- `GET /v1/ofertas` — app/main.py:2054
-- `POST /v1/ofertas/{oferta_id}/assumir` — app/main.py:2091
-- `POST /v1/fila-vendedores` — app/main.py:2112
-- `PATCH /v1/fila-vendedores/{vendedor_id}` — app/main.py:2131
-- `DELETE /v1/fila-vendedores/{vendedor_id}` — app/main.py:2162
-- `POST /v1/operacao/solicitacoes-simulacao-humana` — app/main.py:2183
-- `POST /v1/operacao/responder` — app/main.py:2223
-- `POST /v1/operacao/handoff-humano` — app/main.py:2275
-- `POST /v1/operacao/moto-escolhida` — app/main.py:2323
-- `GET /v1/operacao/grupo-estoque` — app/main.py:2351
-- `PUT /v1/operacao/grupo-estoque` — app/main.py:2370
-- `DELETE /v1/operacao/grupo-estoque` — app/main.py:2397
-- `GET /v1/operacao/numeros-autorizados` — app/main.py:2404
-- `POST /v1/operacao/numeros-autorizados` — app/main.py:2411
-- `DELETE /v1/operacao/numeros-autorizados/{telefone}` — app/main.py:2422
-- `POST /v1/operacao/veiculos` — app/main.py:2431
+- `GET /v1/conversas/{telefone}/mensagens/{mensagem_id}/midia` — app/main.py:1165
+- `POST /v1/consentimentos` — app/main.py:1191
+- `POST /v1/leads` — app/main.py:1204
+- `POST /v1/integracoes/catalogo/interesses` — app/main.py:1215
+- `GET /v1/leads` — app/main.py:1249
+- `GET /v1/funil/eventos` — app/main.py:1259
+- `GET /v1/auditoria/ctwa` — app/main.py:1278
+- `GET /v1/atendimento/resumo` — app/main.py:1330
+- `GET /v1/leads.csv` — app/main.py:1342
+- `GET /v1/leads/{lead_id}` — app/main.py:1388
+- `PATCH /v1/leads/{lead_id}/etapa` — app/main.py:1395
+- `GET /v1/config/catalogo-bot` — app/main.py:1407
+- `GET /v1/agente/config` — app/main.py:1452
+- `GET /v1/agente/rascunho` — app/main.py:1502
+- `PUT /v1/agente/rascunho` — app/main.py:1513
+- `POST /v1/agente/publicar` — app/main.py:1528
+- `POST /v1/agente/preview` — app/main.py:1555
+- `GET /v1/agente/versoes` — app/main.py:1612
+- `POST /v1/agente/versoes/{versao_id}/restaurar` — app/main.py:1632
+- `GET /v1/estoque/buscar` — app/main.py:1650
+- `GET /v1/estoque/por-placa/{placa}` — app/main.py:1676
+- `GET /v1/estoque/veiculos/{veiculo_id}/midia-principal` — app/main.py:1693
+- `POST /v1/internal/provisioning/state` — app/main.py:1781
+- `POST /v1/simulacoes/solicitar` — app/main.py:1802
+- `POST /v1/simular` — app/main.py:1841
+- `GET /v1/whatsapp/canais` — app/main.py:1908
+- `POST /v1/whatsapp/canais` — app/main.py:1920
+- `POST /v1/whatsapp/canais/cloud/onboarding` — app/main.py:1948
+- `POST /v1/whatsapp/canais/{canal_id}/principal-estoque` — app/main.py:1992
+- `POST /v1/whatsapp/canais/{canal_id}/inativar` — app/main.py:2002
+- `POST /v1/whatsapp/canais/{canal_id}/connect` — app/main.py:2012
+- `GET /v1/whatsapp/canais/{canal_id}/status` — app/main.py:2029
+- `POST /v1/whatsapp/canais/{canal_id}/disconnect` — app/main.py:2039
+- `GET /v1/fila-vendedores` — app/main.py:2071
+- `GET /v1/ofertas` — app/main.py:2080
+- `POST /v1/ofertas/{oferta_id}/assumir` — app/main.py:2117
+- `POST /v1/fila-vendedores` — app/main.py:2138
+- `PATCH /v1/fila-vendedores/{vendedor_id}` — app/main.py:2157
+- `DELETE /v1/fila-vendedores/{vendedor_id}` — app/main.py:2188
+- `POST /v1/operacao/solicitacoes-simulacao-humana` — app/main.py:2209
+- `POST /v1/operacao/responder` — app/main.py:2249
+- `POST /v1/operacao/handoff-humano` — app/main.py:2301
+- `POST /v1/operacao/moto-escolhida` — app/main.py:2349
+- `GET /v1/operacao/grupo-estoque` — app/main.py:2377
+- `PUT /v1/operacao/grupo-estoque` — app/main.py:2396
+- `DELETE /v1/operacao/grupo-estoque` — app/main.py:2423
+- `GET /v1/operacao/numeros-autorizados` — app/main.py:2430
+- `POST /v1/operacao/numeros-autorizados` — app/main.py:2437
+- `DELETE /v1/operacao/numeros-autorizados/{telefone}` — app/main.py:2448
+- `POST /v1/operacao/veiculos` — app/main.py:2457
 
 ## Modelos
 

@@ -102,7 +102,15 @@
       lastId = id;
     }
     if (msg.tipo === "audio") {
-      bolha.appendChild(document.createTextNode("Áudio"));
+      if (id) {
+        var player = document.createElement("audio");
+        player.controls = true;
+        player.preload = "none";
+        player.src = mediaUrl(id);
+        bolha.appendChild(player);
+      } else {
+        bolha.appendChild(document.createTextNode("Áudio"));
+      }
     } else {
       bolha.appendChild(document.createTextNode(msg.texto || "—"));
     }
@@ -122,6 +130,12 @@
     for (var i = 0; i < bolhas.length; i++) {
       registerBubble(bolhas[i]);
     }
+  }
+
+  function mediaUrl(id) {
+    // pollUrl = .../atendimento/<tel>/mensagens.json → .../atendimento/<tel>
+    var base = pollUrl.replace(/\/mensagens\.json.*$/, "");
+    return base + "/audio/" + encodeURIComponent(id);
   }
 
   function buildPollUrl() {

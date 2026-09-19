@@ -2156,6 +2156,77 @@ def enviar_audio_humano(
     }
 
 
+def _parse_range(range_header: str | None, tamanho: int):
+    """Interpreta ``Range: bytes=…``. None = sem range; "invalido" = 416."""
+    if not range_header or not range_header.strip().lower().startswith("bytes="):
+        return None
+    spec = range_header.split("=", 1)[1].split(",")[0].strip()
+    if "-" not in spec:
+        return None
+    inicio_s, fim_s = spec.split("-", 1)
+    try:
+        if inicio_s == "":
+            n = int(fim_s)
+            if n <= 0:
+                return "invalido"
+            return max(0, tamanho - n), tamanho - 1
+        inicio = int(inicio_s)
+        fim = int(fim_s) if fim_s else tamanho - 1
+    except ValueError:
+        return "invalido"
+    if inicio > fim or inicio >= tamanho:
+        return "invalido"
+    return inicio, min(fim, tamanho - 1)
+
+
+def _resposta_midia(conteudo: bytes, mime: str, range_header: str | None):
+    """(status, headers, corpo). Suporta requisição parcial para o player."""
+    faixa = _parse_range(range_header, len(conteudo))
+    if faixa == "invalido":
+        return 416, {"Accept-Ranges": "bytes", "Content-Range": f"bytes */{len(conteudo)}"}, b""
+    if faixa is not None:
+        inicio, fim = faixa
+        return (
+            206,
+            {
+                "Accept-Ranges": "bytes",
+                "Content-Range": f"bytes {inicio}-{fim}/{len(conteudo)}",
+            },
+            conteudo[inicio : fim + 1],
+        )
+    return 200, {"Accept-Ranges": "bytes"}, conteudo
+
+
+def baixar_midia_humana(
+    db: Session,
+    loja_id: str,
+    mensagem_id: str,
+    *,
+    range_header: str | None = None,
+    media=None,
+):
+    """Lê o áudio de uma mensagem da própria Loja. Devolve (status, headers, corpo, mime)."""
+    from app.audio_humano import AudioMediaError, get_audio_media_port
+
+    msg = db.get(Mensagem, mensagem_id)
+    if (
+        msg is None
+        or msg.loja_id != loja_id
+        or msg.tipo != "audio"
+        or not msg.media_ref
+    ):
+        raise HTTPException(status_code=404, detail="mídia não encontrada")
+
+    port = media or get_audio_media_port()
+    try:
+        conteudo, mime = port.ler(msg.media_ref)
+    except AudioMediaError as exc:
+        raise HTTPException(status_code=404, detail="mídia não encontrada") from exc
+
+    status, headers, corpo = _resposta_midia(conteudo, mime, range_header)
+    return status, headers, corpo, mime
+
+
 def para_saida_mensagem(msg: Mensagem) -> dict:
     return {
         "id": msg.id,
