@@ -1,5 +1,5 @@
 {
- "sha": "fc90e7c",
+ "sha": "caab3ac",
  "inventario": {
   "chatbot-api": [
    {
@@ -1262,266 +1262,266 @@
     "chave": "GET /health/live",
     "simbolo": "/health/live",
     "arquivo": "app/main.py",
-    "linha": 592
+    "linha": 583
    },
    {
     "secao": "rota",
     "chave": "GET /health/ready",
     "simbolo": "/health/ready",
     "arquivo": "app/main.py",
-    "linha": 597
+    "linha": 588
    },
    {
     "secao": "rota",
     "chave": "GET /public/v1/lojas/{loja_slug}/pixel",
     "simbolo": "/public/v1/lojas/{loja_slug}/pixel",
     "arquivo": "app/main.py",
-    "linha": 606
+    "linha": 597
    },
    {
     "secao": "rota",
     "chave": "GET /",
     "simbolo": "/",
     "arquivo": "app/main.py",
-    "linha": 641
+    "linha": 632
    },
    {
     "secao": "rota",
     "chave": "GET /login",
     "simbolo": "/login",
     "arquivo": "app/main.py",
-    "linha": 646
+    "linha": 637
    },
    {
     "secao": "rota",
     "chave": "POST /login",
     "simbolo": "/login",
     "arquivo": "app/main.py",
-    "linha": 653
+    "linha": 644
    },
    {
     "secao": "rota",
     "chave": "POST /logout",
     "simbolo": "/logout",
     "arquivo": "app/main.py",
-    "linha": 674
+    "linha": 665
    },
    {
     "secao": "rota",
     "chave": "GET /conta/senha",
     "simbolo": "/conta/senha",
     "arquivo": "app/main.py",
-    "linha": 681
+    "linha": 672
    },
    {
     "secao": "rota",
     "chave": "POST /conta/senha",
     "simbolo": "/conta/senha",
     "arquivo": "app/main.py",
-    "linha": 690
+    "linha": 681
    },
    {
     "secao": "rota",
     "chave": "GET /app",
     "simbolo": "/app",
     "arquivo": "app/main.py",
-    "linha": 727
+    "linha": 718
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque",
     "simbolo": "/app/estoque",
     "arquivo": "app/main.py",
-    "linha": 856
+    "linha": 847
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque/novo",
     "simbolo": "/app/estoque/novo",
     "arquivo": "app/main.py",
-    "linha": 895
+    "linha": 886
    },
    {
     "secao": "rota",
     "chave": "GET /app/operacao/numeros",
     "simbolo": "/app/operacao/numeros",
     "arquivo": "app/main.py",
-    "linha": 995
+    "linha": 986
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/grupo",
     "simbolo": "/app/operacao/grupo",
     "arquivo": "app/main.py",
-    "linha": 1028
+    "linha": 1019
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/numeros",
     "simbolo": "/app/operacao/numeros",
     "arquivo": "app/main.py",
-    "linha": 1056
+    "linha": 1047
    },
    {
     "secao": "rota",
     "chave": "POST /app/operacao/numeros/remover",
     "simbolo": "/app/operacao/numeros/remover",
     "arquivo": "app/main.py",
-    "linha": 1083
+    "linha": 1074
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/novo",
     "simbolo": "/app/estoque/novo",
     "arquivo": "app/main.py",
-    "linha": 1109
+    "linha": 1100
    },
    {
     "secao": "rota",
     "chave": "GET /app/estoque/{veiculo_id}",
     "simbolo": "/app/estoque/{veiculo_id}",
     "arquivo": "app/main.py",
-    "linha": 1136
+    "linha": 1127
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/{veiculo_id}",
     "simbolo": "/app/estoque/{veiculo_id}",
     "arquivo": "app/main.py",
-    "linha": 1167
+    "linha": 1158
    },
    {
     "secao": "rota",
     "chave": "POST /app/estoque/{veiculo_id}/{acao}",
     "simbolo": "/app/estoque/{veiculo_id}/{acao}",
     "arquivo": "app/main.py",
-    "linha": 1195
+    "linha": 1186
    },
    {
     "secao": "rota",
     "chave": "GET /app/leads",
     "simbolo": "/app/leads",
     "arquivo": "app/main.py",
-    "linha": 1242
+    "linha": 1233
    },
    {
     "secao": "rota",
     "chave": "GET /app/leads/{lead_id}",
     "simbolo": "/app/leads/{lead_id}",
     "arquivo": "app/main.py",
-    "linha": 1270
+    "linha": 1261
    },
    {
     "secao": "rota",
     "chave": "POST /app/leads/{lead_id}/etapa",
     "simbolo": "/app/leads/{lead_id}/etapa",
     "arquivo": "app/main.py",
-    "linha": 1306
+    "linha": 1297
    },
    {
     "secao": "rota",
     "chave": "GET /app/conversas",
     "simbolo": "/app/conversas",
     "arquivo": "app/main.py",
-    "linha": 1365
+    "linha": 1356
    },
    {
     "secao": "rota",
     "chave": "GET /app/conversas/{telefone}",
     "simbolo": "/app/conversas/{telefone}",
     "arquivo": "app/main.py",
-    "linha": 1392
+    "linha": 1383
    },
    {
     "secao": "rota",
     "chave": "POST /app/conversas/{telefone}/handoff",
     "simbolo": "/app/conversas/{telefone}/handoff",
     "arquivo": "app/main.py",
-    "linha": 1485
+    "linha": 1476
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendas",
     "simbolo": "/app/vendas",
     "arquivo": "app/main.py",
-    "linha": 1598
+    "linha": 1589
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendas/nova",
     "simbolo": "/app/vendas/nova",
     "arquivo": "app/main.py",
-    "linha": 1638
+    "linha": 1629
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/nova",
     "simbolo": "/app/vendas/nova",
     "arquivo": "app/main.py",
-    "linha": 1655
+    "linha": 1646
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/{venda_id}/confirmar",
     "simbolo": "/app/vendas/{venda_id}/confirmar",
     "arquivo": "app/main.py",
-    "linha": 2058
+    "linha": 2049
    },
    {
     "secao": "rota",
     "chave": "POST /app/vendas/{venda_id}/cancelar",
     "simbolo": "/app/vendas/{venda_id}/cancelar",
     "arquivo": "app/main.py",
-    "linha": 2076
+    "linha": 2067
    },
    {
     "secao": "rota",
     "chave": "GET /app/vendedor",
     "simbolo": "/app/vendedor",
     "arquivo": "app/main.py",
-    "linha": 2088
+    "linha": 2079
    },
    {
     "secao": "rota",
     "chave": "GET /app/funil",
     "simbolo": "/app/funil",
     "arquivo": "app/main.py",
-    "linha": 2199
+    "linha": 2190
    },
    {
     "secao": "rota",
     "chave": "GET /app/funil/dados",
     "simbolo": "/app/funil/dados",
     "arquivo": "app/main.py",
-    "linha": 2275
+    "linha": 2266
    },
    {
     "secao": "rota",
     "chave": "GET /app/financeiro",
     "simbolo": "/app/financeiro",
     "arquivo": "app/main.py",
-    "linha": 2312
+    "linha": 2303
    },
    {
     "secao": "rota",
     "chave": "GET /app/financeiras",
     "simbolo": "/app/financeiras",
     "arquivo": "app/main.py",
-    "linha": 2389
+    "linha": 2380
    },
    {
     "secao": "rota",
     "chave": "POST /app/financeiras/{nome}",
     "simbolo": "/app/financeiras/{nome}",
     "arquivo": "app/main.py",
-    "linha": 2453
+    "linha": 2444
    },
    {
     "secao": "rota",
     "chave": "GET /app/configuracoes",
     "simbolo": "/app/configuracoes",
     "arquivo": "app/main.py",
-    "linha": 2575
+    "linha": 2566
    },
    {
     "secao": "worker",
@@ -2697,7 +2697,7 @@
     "chave": "app/templates/configuracoes/index.html",
     "simbolo": "configuracoes/index.html",
     "arquivo": "app/main.py",
-    "linha": 2615
+    "linha": 2606
    },
    {
     "secao": "template",
@@ -2711,14 +2711,14 @@
     "chave": "app/templates/conversas/detalhe.html",
     "simbolo": "conversas/detalhe.html",
     "arquivo": "app/main.py",
-    "linha": 1417
+    "linha": 1408
    },
    {
     "secao": "template",
     "chave": "app/templates/conversas/lista.html",
     "simbolo": "conversas/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1381
+    "linha": 1372
    },
    {
     "secao": "template",
@@ -2732,7 +2732,7 @@
     "chave": "app/templates/dashboard.html",
     "simbolo": "dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 837
+    "linha": 828
    },
    {
     "secao": "template",
@@ -2774,56 +2774,56 @@
     "chave": "app/templates/estoque/form.html",
     "simbolo": "estoque/form.html",
     "arquivo": "app/main.py",
-    "linha": 906
+    "linha": 897
    },
    {
     "secao": "template",
     "chave": "app/templates/estoque/lista.html",
     "simbolo": "estoque/lista.html",
     "arquivo": "app/main.py",
-    "linha": 881
+    "linha": 872
    },
    {
     "secao": "template",
     "chave": "app/templates/financeiras/lista.html",
     "simbolo": "financeiras/lista.html",
     "arquivo": "app/main.py",
-    "linha": 2439
+    "linha": 2430
    },
    {
     "secao": "template",
     "chave": "app/templates/financeiro/dashboard.html",
     "simbolo": "financeiro/dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 2368
+    "linha": 2359
    },
    {
     "secao": "template",
     "chave": "app/templates/funil/index.html",
     "simbolo": "funil/index.html",
     "arquivo": "app/main.py",
-    "linha": 2262
+    "linha": 2253
    },
    {
     "secao": "template",
     "chave": "app/templates/leads/detalhe.html",
     "simbolo": "leads/detalhe.html",
     "arquivo": "app/main.py",
-    "linha": 1294
+    "linha": 1285
    },
    {
     "secao": "template",
     "chave": "app/templates/leads/lista.html",
     "simbolo": "leads/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1259
+    "linha": 1250
    },
    {
     "secao": "template",
     "chave": "app/templates/login.html",
     "simbolo": "login.html",
     "arquivo": "app/main.py",
-    "linha": 650
+    "linha": 641
    },
    {
     "secao": "template",
@@ -2970,7 +2970,7 @@
     "chave": "app/templates/operacao/numeros.html",
     "simbolo": "operacao/numeros.html",
     "arquivo": "app/main.py",
-    "linha": 1017
+    "linha": 1008
    },
    {
     "secao": "template",
@@ -3082,21 +3082,21 @@
     "chave": "app/templates/vendas/form.html",
     "simbolo": "vendas/form.html",
     "arquivo": "app/main.py",
-    "linha": 1580
+    "linha": 1571
    },
    {
     "secao": "template",
     "chave": "app/templates/vendas/lista.html",
     "simbolo": "vendas/lista.html",
     "arquivo": "app/main.py",
-    "linha": 1624
+    "linha": 1615
    },
    {
     "secao": "template",
     "chave": "app/templates/vendedor/dashboard.html",
     "simbolo": "vendedor/dashboard.html",
     "arquivo": "app/main.py",
-    "linha": 2183
+    "linha": 2174
    },
    {
     "secao": "migration",

@@ -137,7 +137,13 @@ jobs:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: deploy
-        run: flyctl deploy . --app "$APP" --config deploy/fly/3vm/fly.app.toml --ha=false --wait-timeout 600
+        run: |
+          set -euo pipefail
+          # Carimba o SHA no /healthz (Dockerfile.app ARG/ENV REVY_GIT_SHA). Sem
+          # isso o healthz responde "sha:desconhecido" e o pos-flight da
+          # revy-deploy nao consegue provar qual commit esta no ar.
+          SHA=$(git rev-parse --short HEAD)
+          flyctl deploy . --app "$APP" --config deploy/fly/3vm/fly.app.toml --ha=false --wait-timeout 600 --build-arg GIT_SHA="$SHA"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
