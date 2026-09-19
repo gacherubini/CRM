@@ -190,12 +190,19 @@ class PanPortalDriver(PlaywrightBankDriver):
             config, "PAN_PORTAL_LOGIN_URL", LOGIN_URL_DEFAULT
         )
         self.html_simulacao = html_simulacao
+        # Agente/operador ja escolhidos nesta sessao de browser. Sem isto o
+        # modal era reaberto a cada passo e a 2a gravacao travava o Salvar
+        # (`pan_agente_nao_salvou`, print/probe de 19/09).
+        self._agente_operador_definido = False
 
     # --- entrada ------------------------------------------------------------
 
     def simular(
         self, sol: SolicitacaoSimulacao, ctx: DriverContext | None = None
     ) -> list[ResultadoDriver]:
+        # Estado por rodada: o driver vive como singleton em REAL_DRIVERS, entao
+        # o flag do modal nao pode vazar de uma execucao para a outra.
+        self._agente_operador_definido = False
         self._validar_solicitacao(sol)
 
         html = self.html_simulacao
@@ -625,6 +632,17 @@ class PanPortalDriver(PlaywrightBankDriver):
         except Exception:
             pass
         candidatos = (
+            # O X real do go!PAN e um `<mahoe-nav-button class="mahoe-modal__button-modal
+            # mahoe-modal__button-modal--close">` (traco DUPLO no modifier; diag de
+            # 19/09). Os seletores antigos (`button.close`, `aria-label*='echar'/'lose'`)
+            # nunca casavam e o modal ficava aberto -> `pan_modal_agente_nao_fechou`.
+            lambda: page.locator(
+                ".mahoe-modal__dialog .mahoe-modal__button-modal--close"
+            ).first,
+            lambda: page.locator(
+                ".mahoe-modal__dialog .mahoe-modal__button-modal--close button"
+            ).first,
+            lambda: page.locator(".mahoe-modal__button-modal--close").first,
             lambda: page.locator(
                 ".mahoe-modal__dialog button[aria-label*='echar' i]"
             ).first,
@@ -640,7 +658,12 @@ class PanPortalDriver(PlaywrightBankDriver):
                 botao = gerar()
                 if botao.count():
                     botao.click(timeout=min(self.timeout_ms, 5_000))
-                    page.wait_for_timeout(400)
+                    # A animacao de fechamento pode passar de 400ms; espera a
+                    # condicao em vez de cravar tempo (senao fecha e acusa aberto).
+                    for _ in range(8):
+                        page.wait_for_timeout(400)
+                        if not self._modal_agente_aberto(page):
+                            return
             except Exception:
                 continue
         if self._modal_agente_aberto(page):
@@ -664,7 +687,10 @@ class PanPortalDriver(PlaywrightBankDriver):
         """
         quer_definir = bool(config.PAN_AGENTE_CERTIFICADO or config.PAN_OPERADOR)
         if not self._modal_agente_aberto(page):
-            if not quer_definir:
+            # Ja definimos nesta sessao: nao reabre a cada passo. Reabrir e
+            # gravar de novo era o que travava o Salvar e derrubava o PAN
+            # (`pan_agente_nao_salvou`, probe de 19/09).
+            if not quer_definir or self._agente_operador_definido:
                 return
             self._abrir_modal_agente(page)
         elif not quer_definir:
@@ -678,13 +704,30 @@ class PanPortalDriver(PlaywrightBankDriver):
             page, "commercialOperator", config.PAN_OPERADOR, "operador"
         )
 
-        page.get_by_role(
-            "button", name=re.compile(r"^\s*Salvar\s*$", re.I)
-        ).first.click(timeout=min(self.timeout_ms, 10_000))
-        for _ in range(20):
-            page.wait_for_timeout(500)
-            if not self._modal_agente_aberto(page):
-                return
+        self._clicar_salvar(page)
+        self._agente_operador_definido = True
+
+    def _clicar_salvar(self, page) -> None:
+        """Clica em Salvar e confirma que o dialogo fechou.
+
+        O go!PAN re-renderiza o modal (Angular) logo depois de escolher o
+        operador: no probe de 19/09 o `get_by_role("button", name="Salvar")`
+        resolveu para ZERO no instante do clique e o `click` queimou os 10s
+        ate estourar, derrubando o PAN em producao. Ancorar no
+        `button.mahoe-button` e repetir se o modal nao fechar cobre a corrida
+        sem depender de espera fixa.
+        """
+        botao = page.locator("button.mahoe-button:has-text('Salvar')").first
+        for _ in range(3):
+            try:
+                botao.wait_for(state="visible", timeout=min(self.timeout_ms, 8_000))
+                botao.click(timeout=min(self.timeout_ms, 8_000))
+            except Exception:
+                pass
+            for _ in range(10):  # ate 5s de animacao de fechamento
+                page.wait_for_timeout(500)
+                if not self._modal_agente_aberto(page):
+                    return
         raise ErroTransitorio(
             "pan_agente_nao_salvou",
             "dialogo de agente/operador continuou aberto depois do Salvar",

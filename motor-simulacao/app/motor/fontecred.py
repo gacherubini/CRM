@@ -737,6 +737,11 @@ class FontecredDriver(PlaywrightBankDriver):
         self._levantar_se_recusado(page)
 
     def _passo_veiculo(self, page, sol: SolicitacaoSimulacao) -> None:
+        # O modal da política de crédito pode já estar na tela quando o passo
+        # começa (a consulta do CPF é assíncrona): com ele por cima, o clique na
+        # placa morre no overlay e o veículo em branco sai como erro técnico.
+        # Sonda antes de tocar na placa para virar `credito_recusado`.
+        self._levantar_se_recusado(page)
         # Moto usada (0KM = Não, value "0")
         try:
             page.get_by_label(re.compile(r"Veículo 0KM", re.I)).select_option("0")
