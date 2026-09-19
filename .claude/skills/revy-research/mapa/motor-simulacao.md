@@ -1,6 +1,6 @@
 # motor-simulacao · 17 rotas · 12 modelos · 1 workers · 2 flags · 14 migrations
 
-Gerado de `dab2d20`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `bf329de`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0014`
 
 ## Rotas

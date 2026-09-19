@@ -1,6 +1,6 @@
 # estoque-api · 41 rotas · 12 modelos · 1 workers · 10 migrations · 3 templates
 
-Gerado de `dab2d20`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `bf329de`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0010`
 
 ## Rotas
