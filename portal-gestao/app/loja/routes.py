@@ -1206,6 +1206,43 @@ def atendimento_audio_midia(
     )
 
 
+@router.post("/app/loja/atendimento/{workspace_id}/audio/{mensagem_id}/transcrever")
+def atendimento_transcrever_audio(
+    request: Request,
+    workspace_id: str,
+    mensagem_id: str,
+    db: Session = Depends(get_db),
+    media: AudioMediaPort = Depends(get_audio_media_port),
+):
+    """Transcrição sob demanda de um áudio, via Chatbot (mesmo Whisper do inbound)."""
+    usuario = usuario_atual(request, db)
+    if not usuario:
+        return _json_erro(401, "auth", "Não autenticado")
+    if not atendimento_habilitado():
+        return _json_erro(404, "flag", "Atendimento não habilitado")
+    if not pode_usar_atendimento(usuario):
+        return _json_erro(403, "perm", "Sem permissão")
+
+    telefone = normalizar_telefone(workspace_id)
+    if not telefone:
+        return _json_erro(404, "not_found", "Atendimento não encontrado")
+
+    atribuicoes = carregar_atribuicoes_ativas(db, usuario.loja_slug)
+    atr = atribuicao_para_telefone(atribuicoes, telefone)
+    if not visivel_para_usuario(usuario, atribuicao=atr):
+        return _json_erro(403, "scope", "Atendimento fora do seu escopo")
+
+    try:
+        texto = media.transcrever(telefone, mensagem_id)
+    except AudioMediaNaoEncontrada:
+        return _json_erro(404, "midia", "Áudio não encontrado")
+    except ChatbotIndisponivel:
+        return _json_erro(
+            503, "transcricao", "Não foi possível transcrever o áudio agora"
+        )
+    return JSONResponse({"ok": True, "transcricao": texto})
+
+
 @router.post("/app/loja/atendimento/{workspace_id}/handoff")
 async def atendimento_handoff(
     request: Request,

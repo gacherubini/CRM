@@ -86,7 +86,7 @@
       <div class="thread" data-thread role="log" aria-live="polite" aria-relevant="additions">
         {% if workspace.mensagens %}
         {% for m in workspace.mensagens %}
-        <div class="bolha {{ m.direcao }}"{% if m.id %} data-msg-id="{{ m.id }}"{% endif %}>{% if m.tipo == 'audio' %}<audio controls preload="none" src="/app/loja/atendimento/{{ workspace.id }}/audio/{{ m.id }}"></audio>{% else %}{{ m.texto or '—' }}{% endif %}<small>{% if m.direcao == 'entrada' %}{% if workspace.lead and workspace.lead.nome %}{{ workspace.lead.nome }}{% else %}Cliente{% endif %}{% else %}Equipe{% endif %} · {{ formatar_horario(m.criada_em) }}</small></div>
+        <div class="bolha {{ m.direcao }}"{% if m.id %} data-msg-id="{{ m.id }}"{% endif %}>{% if m.tipo == 'audio' %}<audio controls preload="none" src="/app/loja/atendimento/{{ workspace.id }}/audio/{{ m.id }}"></audio>{% if m.transcricao %}<span class="audio-transcricao" data-audio-transcricao>{{ m.transcricao }}</span>{% else %}<button type="button" class="link" data-transcrever data-url="/app/loja/atendimento/{{ workspace.id }}/audio/{{ m.id }}/transcrever">Transcrever</button><span class="audio-transcricao" data-audio-transcricao></span>{% endif %}{% else %}{{ m.texto or '—' }}{% endif %}<small>{% if m.direcao == 'entrada' %}{% if workspace.lead and workspace.lead.nome %}{{ workspace.lead.nome }}{% else %}Cliente{% endif %}{% else %}Equipe{% endif %} · {{ formatar_horario(m.criada_em) }}</small></div>
         {% endfor %}
         {% else %}
         <div class="thread-empty" data-thread-empty>

@@ -1405,6 +1405,8 @@ tr:hover td { background: var(--surface-soft); }
 }
 .composer-audio audio { height: 32px; max-width: 100%; }
 .audio-timer { font-variant-numeric: tabular-nums; }
+.bolha audio { display: block; max-width: 100%; }
+.audio-transcricao { display: block; font-size: var(--text-sm); color: var(--ink-muted); }
 .composer-blocked { border-top: 1px solid var(--line); }
 .composer-blocked .alert { margin: 0; }
 

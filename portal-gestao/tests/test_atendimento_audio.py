@@ -135,6 +135,12 @@ class _MediaFake:
             )
         return AudioMidia(status=200, content=b"OGG123", media_type="audio/ogg")
 
+    def transcrever(self, telefone, mensagem_id):
+        self.chamadas.append({"transcrever": mensagem_id})
+        if mensagem_id == "sumiu":
+            raise AudioMediaNaoEncontrada("áudio não encontrado")
+        return "bom dia, tudo certo com a moto?"
+
 
 @pytest.fixture
 def media_fake(atendimento_on):
@@ -203,6 +209,43 @@ def test_proxy_midia_sem_login_401(client, chatbot_fake, media_fake):
         headers={"Accept": "application/json"},
     )
     assert r.status_code == 401
+
+
+def test_proxy_transcricao(client, chatbot_fake, media_fake):
+    login(client)
+    r = client.post(
+        f"/app/loja/atendimento/{TELEFONE}/audio/msg-1/transcrever",
+        headers={"Accept": "application/json"},
+    )
+
+    assert r.status_code == 200, r.text
+    assert r.json()["ok"] is True
+    assert r.json()["transcricao"] == "bom dia, tudo certo com a moto?"
+
+
+def test_proxy_transcricao_fora_escopo_403(client, chatbot_fake, media_fake, db):
+    from app.financeiro_calc import identidade_telefone
+    from app.models import AtendimentoAtribuicao, agora
+
+    db.add(
+        AtendimentoAtribuicao(
+            loja_slug="loja-teste",
+            telefone_hmac=identidade_telefone(TELEFONE),
+            vendedor_email="outro@loja.test",
+            origem="handoff_portal",
+            iniciada_em=agora(),
+            ativa=True,
+        )
+    )
+    db.commit()
+
+    login(client, papel="vendedor", email="vendedor@loja.test")
+    r = client.post(
+        f"/app/loja/atendimento/{TELEFONE}/audio/msg-1/transcrever",
+        headers={"Accept": "application/json"},
+    )
+
+    assert r.status_code == 403
 
 
 def test_workspace_esconde_mic_fora_do_modo2(client, chatbot_fake, atendimento_on):

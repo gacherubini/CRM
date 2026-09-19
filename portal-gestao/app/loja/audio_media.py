@@ -39,6 +39,8 @@ class AudioMediaPort(Protocol):
         range_header: str | None = None,
     ) -> AudioMidia: ...
 
+    def transcrever(self, telefone: str, mensagem_id: str) -> str: ...
+
 
 class HttpAudioMedia:
     """Adapter HTTP → Chatbot ``GET /v1/conversas/{telefone}/mensagens/{id}/midia``."""
@@ -95,6 +97,37 @@ class HttpAudioMedia:
             media_type=resposta.headers.get("content-type", "audio/ogg"),
             content_range=resposta.headers.get("content-range"),
         )
+
+    def transcrever(self, telefone: str, mensagem_id: str) -> str:
+        if not self.configurado:
+            raise ChatbotIndisponivel("Integração do chatbot ainda não configurada")
+        digitos = "".join(c for c in (telefone or "") if c.isdigit())
+        try:
+            with httpx.Client(
+                base_url=self.base_url,
+                headers={"Authorization": f"Bearer {self.token}"},
+                timeout=self.timeout,
+            ) as client:
+                resposta = client.post(
+                    f"/v1/conversas/{digitos}/mensagens/{mensagem_id}/transcrever"
+                )
+        except httpx.HTTPError:
+            raise ChatbotIndisponivel(
+                "Não foi possível transcrever o áudio agora"
+            ) from None
+        if resposta.status_code == 404:
+            raise AudioMediaNaoEncontrada("áudio não encontrado")
+        if resposta.status_code >= 400:
+            raise ChatbotIndisponivel(
+                "Não foi possível transcrever o áudio agora"
+            )
+        try:
+            dados = resposta.json()
+        except ValueError:
+            raise ChatbotIndisponivel(
+                "Não foi possível transcrever o áudio agora"
+            ) from None
+        return str(dados.get("transcricao") or "")
 
 
 def get_audio_media_port(request: Request) -> AudioMediaPort:

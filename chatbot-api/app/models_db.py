@@ -251,6 +251,8 @@ class Mensagem(Base):
     )
     media_ref: Mapped[str | None] = mapped_column(String(300), nullable=True)
     duracao_segundos: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Transcrição sob demanda do áudio de saída (não é automática no envio).
+    transcricao: Mapped[str | None] = mapped_column(Text, nullable=True)
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora)
 
 

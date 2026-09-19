@@ -36,7 +36,11 @@ from app import (  # noqa: F401 (registra os modelos)
     solicitacoes_simulacao,
 )
 from app.audio import AudioProcessor, get_audio_processor, processador_de_audio
-from app.audio_humano import AudioMediaPort, get_audio_media_port
+from app.audio_humano import (
+    AudioMediaPort,
+    get_audio_media_port,
+    get_transcription_provider,
+)
 from app.cloud_retry import registrar_evento_falho
 from app.meta_webhook import EventoCloud, assinatura_valida, parse_inbound
 from app.meta_onboarding import NOME_TEMPLATE, OnboardingErro
@@ -1185,6 +1189,21 @@ def baixar_midia_humana(
     )
     return Response(
         content=corpo, status_code=status, headers=headers, media_type=mime
+    )
+
+
+@app.post("/v1/conversas/{telefone}/mensagens/{mensagem_id}/transcrever")
+def transcrever_midia_humana(
+    telefone: str,
+    mensagem_id: str,
+    ctx: Contexto = Depends(get_contexto),
+    db: Session = Depends(get_db),
+    media: AudioMediaPort = Depends(get_audio_media_port),
+    provider=Depends(get_transcription_provider),
+):
+    """Transcrição sob demanda do áudio de saída (mesmo Whisper do inbound)."""
+    return servico.transcrever_midia_humana(
+        db, ctx.loja_id, mensagem_id, media=media, provider=provider
     )
 
 

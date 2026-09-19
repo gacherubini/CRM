@@ -108,6 +108,21 @@
         player.preload = "none";
         player.src = mediaUrl(id);
         bolha.appendChild(player);
+        var transcricao = document.createElement("span");
+        transcricao.className = "audio-transcricao";
+        transcricao.setAttribute("data-audio-transcricao", "");
+        if (msg.transcricao) {
+          transcricao.textContent = msg.transcricao;
+        } else {
+          var btnTrans = document.createElement("button");
+          btnTrans.type = "button";
+          btnTrans.className = "link";
+          btnTrans.setAttribute("data-transcrever", "");
+          btnTrans.setAttribute("data-url", mediaUrl(id) + "/transcrever");
+          btnTrans.textContent = "Transcrever";
+          bolha.appendChild(btnTrans);
+        }
+        bolha.appendChild(transcricao);
       } else {
         bolha.appendChild(document.createTextNode("Áudio"));
       }
@@ -502,9 +517,57 @@
     if (sendBtn) sendBtn.addEventListener("click", send);
   }
 
+  function initTranscricao() {
+    root.addEventListener("click", function (ev) {
+      var alvo = ev.target;
+      if (!alvo || !alvo.closest) return;
+      var btn = alvo.closest("[data-transcrever]");
+      if (!btn || !root.contains(btn)) return;
+      ev.preventDefault();
+      var url = btn.getAttribute("data-url");
+      if (!url || typeof fetch !== "function") return;
+      btn.disabled = true;
+      fetch(url, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      })
+        .then(function (res) {
+          return res.json().then(function (data) {
+            return { status: res.status, data: data };
+          });
+        })
+        .then(function (pack) {
+          var data = pack.data || {};
+          if (!data.ok) {
+            setFlash(
+              data.message || "Não foi possível transcrever o áudio agora.",
+              "warn"
+            );
+            btn.disabled = false;
+            return;
+          }
+          var bolha = btn.closest(".bolha");
+          var destino = bolha
+            ? bolha.querySelector("[data-audio-transcricao]")
+            : null;
+          if (destino) destino.textContent = data.transcricao || "";
+          btn.remove();
+        })
+        .catch(function () {
+          setFlash("Não foi possível transcrever o áudio agora.", "warn");
+          btn.disabled = false;
+        });
+    });
+  }
+
   seedFromDom();
   scrollToBottom(true);
   initAudio();
+  initTranscricao();
 
   if (form) {
     ensureIdemField();

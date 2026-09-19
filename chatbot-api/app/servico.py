@@ -2227,6 +2227,90 @@ def baixar_midia_humana(
     return status, headers, corpo, mime
 
 
+def _transcrever_bytes(conteudo: bytes, mime: str | None, provider) -> str:
+    import tempfile
+    from pathlib import Path
+
+    from app.audio_humano import sufixo_por_mime
+
+    with tempfile.TemporaryDirectory(prefix="revy-audio-saida-") as diretorio:
+        arquivo = Path(diretorio) / f"entrada{sufixo_por_mime(mime)}"
+        arquivo.write_bytes(conteudo)
+        texto = (provider.transcrever(arquivo, mime or "audio/ogg") or "").strip()
+    return texto
+
+
+def transcrever_midia_humana(
+    db: Session,
+    loja_id: str,
+    mensagem_id: str,
+    *,
+    media=None,
+    provider=None,
+) -> dict:
+    """Transcreve, sob demanda, o áudio de uma mensagem da própria Loja.
+
+    Idempotente: mensagem já transcrita não chama o provedor de novo.
+    """
+    from app.audio_humano import (
+        AudioMediaError,
+        get_audio_media_port,
+        get_transcription_provider,
+    )
+
+    msg = db.get(Mensagem, mensagem_id)
+    if (
+        msg is None
+        or msg.loja_id != loja_id
+        or msg.tipo != "audio"
+        or not msg.media_ref
+    ):
+        raise HTTPException(status_code=404, detail="mídia não encontrada")
+    if msg.transcricao:
+        return {
+            "mensagem_id": msg.id,
+            "transcricao": msg.transcricao,
+            "duplicada": True,
+        }
+
+    prov = provider if provider is not None else get_transcription_provider()
+    if prov is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "transcricao_indisponivel",
+                "message": "Transcrição não configurada",
+            },
+        )
+
+    port = media or get_audio_media_port()
+    try:
+        conteudo, mime = port.ler(msg.media_ref)
+    except AudioMediaError as exc:
+        raise HTTPException(status_code=404, detail="mídia não encontrada") from exc
+
+    try:
+        texto = _transcrever_bytes(conteudo, mime, prov)
+    except Exception:
+        logger.warning("transcricao de audio de saida falhou")
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "code": "transcricao_falhou",
+                "message": "Não foi possível transcrever o áudio",
+            },
+        ) from None
+    if not texto:
+        raise HTTPException(
+            status_code=502,
+            detail={"code": "transcricao_vazia", "message": "Transcrição vazia"},
+        )
+
+    msg.transcricao = texto[: config.WEBHOOK_MAX_TEXT_CHARS]
+    db.commit()
+    return {"mensagem_id": msg.id, "transcricao": msg.transcricao, "duplicada": False}
+
+
 def para_saida_mensagem(msg: Mensagem) -> dict:
     return {
         "id": msg.id,
@@ -2235,6 +2319,7 @@ def para_saida_mensagem(msg: Mensagem) -> dict:
         "tipo": msg.tipo,
         "media_ref": msg.media_ref,
         "duracao_segundos": msg.duracao_segundos,
+        "transcricao": msg.transcricao,
         "criada_em": msg.criada_em.isoformat() if msg.criada_em else None,
     }
 

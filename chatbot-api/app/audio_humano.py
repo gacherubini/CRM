@@ -195,3 +195,36 @@ class FakeAudioMedia:
 def get_audio_media_port() -> AudioMediaPort:
     """Dependency default; testes sobrescrevem via ``dependency_overrides``."""
     return ArquivoAudioMedia()
+
+
+_SUFIXO_POR_MIME = {
+    "audio/ogg": ".ogg",
+    "audio/opus": ".ogg",
+    "audio/mpeg": ".mp3",
+    "audio/mp4": ".m4a",
+    "audio/m4a": ".m4a",
+    "audio/webm": ".webm",
+    "audio/wav": ".wav",
+    "audio/x-wav": ".wav",
+}
+
+
+def sufixo_por_mime(mime: str | None) -> str:
+    return _SUFIXO_POR_MIME.get(
+        (mime or "").split(";")[0].strip().lower(), ".ogg"
+    )
+
+
+def get_transcription_provider():
+    """Provider de transcrição do inbound, reusado para o áudio de saída.
+
+    ``None`` quando a transcrição não está configurada — a rota responde 503 em
+    vez de gastar com um provedor vazio.
+    """
+    if not config.AUDIO_TRANSCRIPTION_URL:
+        return None
+    from app.audio import HttpTranscriptionProvider
+
+    return HttpTranscriptionProvider(
+        config.AUDIO_TRANSCRIPTION_URL, config.AUDIO_TRANSCRIPTION_TOKEN
+    )

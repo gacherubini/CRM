@@ -1,6 +1,6 @@
-# portal-gestao · 183 rotas · 26 modelos · 6 workers · 37 flags · 27 migrations · 63 templates
+# portal-gestao · 184 rotas · 26 modelos · 6 workers · 37 flags · 27 migrations · 63 templates
 
-Gerado de `7b72320`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `730d9c5`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0027_perfil_avatar_foto`
 
 ## Rotas
@@ -12,13 +12,14 @@ Migration head: `0027_perfil_avatar_foto`
 - `POST /app/loja/atendimento/{workspace_id}/mensagem` — app/loja/routes.py:925
 - `POST /app/loja/atendimento/{workspace_id}/audio` — app/loja/routes.py:1046
 - `GET /app/loja/atendimento/{workspace_id}/audio/{mensagem_id}` — app/loja/routes.py:1163
-- `POST /app/loja/atendimento/{workspace_id}/handoff` — app/loja/routes.py:1209
-- `POST /app/loja/atendimento/{workspace_id}/etapa` — app/loja/routes.py:1288
-- `GET /app/loja/agente/configuracao` — app/loja/routes.py:1434
-- `PUT /app/loja/agente/configuracao.json` — app/loja/routes.py:1464
-- `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1505
-- `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1548
-- `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1570
+- `POST /app/loja/atendimento/{workspace_id}/audio/{mensagem_id}/transcrever` — app/loja/routes.py:1209
+- `POST /app/loja/atendimento/{workspace_id}/handoff` — app/loja/routes.py:1246
+- `POST /app/loja/atendimento/{workspace_id}/etapa` — app/loja/routes.py:1325
+- `GET /app/loja/agente/configuracao` — app/loja/routes.py:1471
+- `PUT /app/loja/agente/configuracao.json` — app/loja/routes.py:1501
+- `POST /app/loja/agente/configuracao/testar.json` — app/loja/routes.py:1542
+- `POST /app/loja/agente/configuracao/publicar` — app/loja/routes.py:1585
+- `POST /app/loja/agente/configuracao/restaurar` — app/loja/routes.py:1607
 - `GET /health/live` — app/main.py:583
 - `GET /health/ready` — app/main.py:588
 - `GET /public/v1/lojas/{loja_slug}/pixel` — app/main.py:597
@@ -303,7 +304,7 @@ Migration head: `0027_perfil_avatar_foto`
 - `app/templates/loja/atendimento_lista.html` — app/loja/routes.py:284
 - `app/templates/loja/agente.html` — app/loja/routes.py:443
 - `app/templates/loja/atendimento_workspace.html` — app/loja/routes.py:560
-- `app/templates/loja/agente_configuracao.html` — app/loja/routes.py:1452
+- `app/templates/loja/agente_configuracao.html` — app/loja/routes.py:1489
 - `app/templates/login.html` — app/main.py:641
 - `app/templates/dashboard.html` — app/main.py:828
 - `app/templates/estoque/lista.html` — app/main.py:872
