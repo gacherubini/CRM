@@ -679,3 +679,128 @@ def test_espera_aborta_na_proposta_recusada():
         driver._passo_aguardar_ofertas(page)
     assert ei.value.codigo == "credito_recusado"
     assert _time.monotonic() - inicio < 10
+
+
+
+# --- campo com mascara: o telefone que saiu torto em producao ----------------
+
+
+class _CampoMascarado:
+    """Input mahoe simulado.
+
+    Dois comportamentos reais, ligaveis por parametro:
+
+    - `come_sem_espera`: a diretiva de mascara descarta a primeira tecla de uma
+      rajada que comeca logo depois da limpeza (Control+a / Delete), enquanto
+      ela ainda esta re-renderizando. Passar uma espera antes de digitar
+      resolve.
+    - `max_digitos`: a mascara tem teto e simplesmente nao aceita o valor
+      inteiro. Nada que o driver faca conserta; ele tem de acusar.
+
+    O sintoma em producao foi `(59) 90333-655` na sim 023321da (19/09, print do
+    evento 7676): 11 digitos entraram, 10 ficaram, e o go!PAN respondeu
+    "Telefone ou DDD invalidos".
+    """
+
+    def __init__(self, come_sem_espera: bool = False, max_digitos: int = 40):
+        self.valor = ""
+        self.come_sem_espera = come_sem_espera
+        self.max_digitos = max_digitos
+        self.assentado = True
+        self.rajadas = 0
+
+    @staticmethod
+    def _limpo(texto: str) -> str:
+        return "".join(c for c in texto if c.isalnum())
+
+    def click(self):
+        pass
+
+    def press(self, tecla):
+        if tecla == "Delete":
+            self.valor = ""
+            self.assentado = False
+
+    def assentar(self):
+        self.assentado = True
+
+    def fill(self, valor):
+        self.valor = self._limpo(valor)[: self.max_digitos]
+
+    def press_sequentially(self, texto, delay=0):
+        self.rajadas += 1
+        chars = self._limpo(texto)
+        if self.come_sem_espera and not self.assentado:
+            chars = chars[1:]
+        self.assentado = True
+        self.valor = (self.valor + chars)[: self.max_digitos]
+
+    def input_value(self):
+        return self.valor
+
+
+def _page_que_assenta(box):
+    """Page cujo wait_for_timeout deixa a mascara assentar, como no browser."""
+    page = MagicMock()
+    page.wait_for_timeout.side_effect = lambda ms: box.assentar() if ms >= 100 else None
+    return page
+
+
+def test_campo_que_nunca_confere_levanta_em_vez_de_seguir():
+    """O bug de producao: o campo fica com menos digitos e o driver segue.
+
+    O go!PAN entao desabilita a busca de placa e o passo seguinte morre em
+    `campo_nao_encontrado - campo Placa nao encontrado`, culpando o campo errado.
+    """
+    driver = PanPortalDriver(timeout_ms=20_000)
+    box = _CampoMascarado(max_digitos=10)
+    page = _page_que_assenta(box)
+
+    with pytest.raises(IntervencaoNecessaria) as ei:
+        driver._digitar_mascarado(page, box, "55990333655", campo="Celular")
+
+    assert ei.value.codigo == "campo_nao_confere"
+
+
+def test_campo_nao_confere_nao_vaza_o_numero_na_mensagem():
+    """Invariante do repo: nunca logar CPF nem celular. A mensagem diz o campo e
+    quantos digitos faltaram, nunca quais."""
+    driver = PanPortalDriver(timeout_ms=20_000)
+    box = _CampoMascarado(max_digitos=10)
+    page = _page_que_assenta(box)
+
+    with pytest.raises(IntervencaoNecessaria) as ei:
+        driver._digitar_mascarado(page, box, "55990333655", campo="Celular")
+
+    texto = f"{ei.value.codigo} {ei.value}"
+    assert "5599033655" not in texto
+    assert "5990333655" not in texto
+    assert "Celular" in texto
+    assert "11" in texto and "10" in texto
+
+
+def test_espera_depois_de_limpar_vence_a_mascara_que_come_a_primeira_tecla():
+    """Mitigacao do mecanismo suspeito: deixar a mascara assentar antes de
+    digitar. Sem a espera, a primeira tecla some e o campo fica com 10 de 11."""
+    driver = PanPortalDriver(timeout_ms=20_000)
+    box = _CampoMascarado(come_sem_espera=True)
+    page = _page_que_assenta(box)
+
+    driver._digitar_mascarado(page, box, "55990333655", campo="Celular")
+
+    assert box.input_value() == "55990333655"
+    assert box.rajadas == 1
+
+
+def test_campo_sem_mascara_real_ainda_aceita_o_fill_direto():
+    """Fallback util preservado: campo que ignora digitacao mas aceita fill."""
+    driver = PanPortalDriver(timeout_ms=20_000)
+    box = _CampoMascarado()
+    page = _page_que_assenta(box)
+    box.press_sequentially = lambda texto, delay=0: None
+
+    driver._digitar_mascarado(
+        page, box, "FUV7G58", normaliza=r"[^A-Za-z0-9]", campo="Placa"
+    )
+
+    assert box.input_value() == "FUV7G58"

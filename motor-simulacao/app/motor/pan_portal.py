@@ -521,13 +521,21 @@ class PanPortalDriver(PlaywrightBankDriver):
         return self._primeiro_visivel(page, candidatos, "Senha (login)")
 
     def _digitar_mascarado(
-        self, page, box, valor: str, normaliza: str = r"\D"
+        self, page, box, valor: str, normaliza: str = r"\D", campo: str = "campo"
     ) -> None:
         """Digita em campo com mascara (mahoe) e CONFERE. A mascara insere
         pontuacao sozinha e perde caractere em digitacao rapida, entao:
-        limpa o campo de forma robusta, digita devagar e refaz mais devagar
-        ate os digitos baterem (delays 110 -> 200 -> 300 ms)."""
+        limpa o campo de forma robusta, deixa a mascara assentar, digita devagar
+        e refaz mais devagar ate os digitos baterem (delays 110 -> 200 -> 300 ms).
+
+        Nao conferiu em nenhuma estrategia? LEVANTA. Seguir com o campo torto foi
+        o que produziu `(59) 90333-655` na sim 023321da (19/09, print do evento
+        7676): o portal invalidou o telefone, desabilitou a busca de placa, e o
+        job morreu em `campo_nao_encontrado` no campo Placa — que nao tinha culpa
+        nenhuma. Erro calado vira diagnostico errado tres passos depois.
+        """
         alvo = re.sub(normaliza, "", valor).upper()
+        atual = ""
         for delay in (110, 200, 300):
             try:
                 box.click()
@@ -538,6 +546,9 @@ class PanPortalDriver(PlaywrightBankDriver):
                     box.press("Delete")
                 except Exception:
                     box.fill("")
+                # A diretiva de mascara re-renderiza depois da limpeza e engole a
+                # primeira tecla de quem digita em cima dela. Deixar assentar.
+                page.wait_for_timeout(150)
                 box.press_sequentially(valor, delay=delay)
                 page.wait_for_timeout(150)
                 atual = re.sub(normaliza, "", box.input_value() or "").upper()
@@ -545,11 +556,21 @@ class PanPortalDriver(PlaywrightBankDriver):
                     return
             except Exception:
                 continue
-        # Ultima tentativa: fill direto (campos sem mascara real).
+        # Campos sem mascara real aceitam fill direto — mas confira este tambem.
         try:
             box.fill(valor)
+            page.wait_for_timeout(150)
+            atual = re.sub(normaliza, "", box.input_value() or "").upper()
+            if atual == alvo:
+                return
         except Exception:
             pass
+        # Nunca o valor na mensagem: o campo carrega CPF e celular.
+        raise IntervencaoNecessaria(
+            "campo_nao_confere",
+            f"campo {campo} nao aceitou o valor digitado: esperados "
+            f"{len(alvo)} caracteres, o campo ficou com {len(atual)}",
+        )
 
     def _primeiro_visivel(self, page, candidatos, campo: str):
         """Retorna o primeiro locator visivel; senao levanta campo_nao_encontrado.
@@ -913,7 +934,7 @@ class PanPortalDriver(PlaywrightBankDriver):
         # Tela /captura/inicio: "informe o CPF do cliente". Campo pan-mahoe com
         # mascara "000.000.000-00" e sem nome acessivel -> ancorar por placeholder
         # da mascara e formcontrolname.
-        self._digitar_mascarado(page, self._campo_cpf(page), cpf)
+        self._digitar_mascarado(page, self._campo_cpf(page), cpf, campo="CPF")
         page.keyboard.press("Tab")
         page.wait_for_timeout(600)
         # O portal pode avancar sozinho ao completar o CPF ou exigir um botao
@@ -959,7 +980,7 @@ class PanPortalDriver(PlaywrightBankDriver):
         # So digitos: a mascara insere ( ) - sozinha. Digitacao lenta com
         # verificacao (mascara mahoe perde caractere em type rapido).
         cel = re.sub(r"\D", "", sol.pessoa.celular or "")
-        self._digitar_mascarado(page, self._campo_celular(page), cel)
+        self._digitar_mascarado(page, self._campo_celular(page), cel, campo="Celular")
         page.keyboard.press("Tab")
         page.wait_for_timeout(400)
 
@@ -975,7 +996,8 @@ class PanPortalDriver(PlaywrightBankDriver):
         except Exception:
             pass
         self._digitar_mascarado(
-            page, self._campo_placa(page), placa, normaliza=r"[^A-Za-z0-9]"
+            page, self._campo_placa(page), placa, normaliza=r"[^A-Za-z0-9]",
+            campo="Placa"
         )
         page.keyboard.press("Tab")
         page.wait_for_timeout(1_200)
