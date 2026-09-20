@@ -80,3 +80,4 @@ escrever migration com `batch_alter_table`.
 | bot responde vazio ou /v1/operacao/responder devolve 422 texto com modelo de raciocinio | `2026-09-16-modelo-que-pensa-nao-cabe-no-teto-250.md` |
 | print de diagnostico do driver mostra a tela errada, ou a resposta do portal nao aparece no screenshot | `2026-09-19-print-do-driver-sai-da-tela-errada.md` |
 | driver preenche campo com mascara e o portal reclama do valor, ou o passo SEGUINTE morre em campo_nao_encontrado | `2026-09-19-campo-mascarado-aceita-menos-do-que-voce-digitou.md` |
+| Bradesco sai com captcha_login / "Erro ao tentar verificar o reCAPTCHA" e voce vai trocar de IP, limpar sessao, mexer no navegador ou no timing do grecaptcha | `2026-09-19-recaptcha-do-bradesco-cinco-suspeitos-eliminados.md` |
