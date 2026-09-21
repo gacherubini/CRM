@@ -489,6 +489,7 @@ def test_valor_de_venda_que_nao_gruda_falha_na_hora():
     """Overlay deixava o campo vazio e o driver so morria 90s depois, no Simular."""
     driver = FontecredDriver(timeout_ms=20_000)
     page = MagicMock()
+    page.get_by_text.return_value.count.return_value = 0  # sem modal de recusa
     caixa = page.get_by_role.return_value.first
     caixa.input_value.return_value = ""
 
@@ -687,3 +688,33 @@ def test_resultado_le_recusa_quando_o_html_e_a_unica_fonte():
             FIXTURE_RECUSA.read_text(encoding="utf-8"), _sol()
         )
     assert ei.value.codigo == "credito_recusado"
+
+
+def test_recusa_tardia_no_financiamento_nao_vira_valor_venda_nao_aplicou():
+    """Print de 20/09 22:46 (job 3244929f): o modal "Este CPF não atende aos
+    critérios mínimos" chegou DEPOIS da sonda do passo do veículo, cobriu o
+    formulário e o campo Valor de venda ficou vazio. Saiu
+    `valor_venda_nao_aplicou` com status Falhou, quando a resposta do banco era
+    recusa de crédito. O overlay que o comentário do passo cita É o modal."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = _page_recusa(FIXTURE_RECUSA.read_text(encoding="utf-8"))
+    page.get_by_role.return_value.first.input_value.return_value = ""
+
+    with pytest.raises(RejeicaoNegocio) as ei:
+        driver._passo_financiamento(page, _sol())
+
+    assert ei.value.codigo == "credito_recusado"
+
+
+def test_campo_de_valor_vazio_sem_recusa_continua_erro_tecnico():
+    """Guarda contra o remendo largo: overlay que NÃO é recusa (portal lento,
+    modal de placa aberto) continua saindo `valor_venda_nao_aplicou`. Sem isto
+    qualquer falha do campo viraria recusa de crédito, que é pior que o bug."""
+    driver = FontecredDriver(timeout_ms=20_000)
+    page = _page_recusa("<html><body><h1>Simulador</h1></body></html>")
+    page.get_by_role.return_value.first.input_value.return_value = ""
+
+    with pytest.raises(ErroTransitorio) as ei:
+        driver._passo_financiamento(page, _sol())
+
+    assert ei.value.codigo == "valor_venda_nao_aplicou"

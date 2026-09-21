@@ -3,7 +3,7 @@ gatilho: tela de recusa de crédito cai em erro técnico genérico em vez de Rej
 produto: motor-simulacao
 custo: 4 bancos recusando o cliente de teste e os 4 saindo como FALHA técnica (32s a 274s cada)
 fonte: repo
-verificado_em: 2026-09-16
+verificado_em: 2026-09-20
 ---
 # Recusa do banco se checa ANTES do erro genérico na espera
 
@@ -36,6 +36,21 @@ conseguimos aprovar o crédito com as condições digitadas") que o regex não
 conhecia: a espera queimou os 505s e saiu `timeout_driver` (sim 9c66b130, placa
 TKL5E99). O regex de recusa agora cobre as duas frases. Ao ver um banco queimar
 o timeout de ofertas, compare o print com o regex antes de culpar o portal.
+
+**20/09 — e tambem no passo do FINANCIAMENTO, o quinto ponto.** Mesmo CPF, job
+3244929f: a recusa chegou depois da sonda do passo do veiculo, o modal cobriu o
+formulario e o campo "Valor de venda" nao gravou. Saiu
+`valor_venda_nao_aplicou` e a simulacao inteira foi marcada **Falhou** — nao
+"sem oferta". O comentario que ja existia ali ("overlay bloqueando o form")
+descrevia o sintoma sem nomear a causa: o overlay E o modal de recusa.
+`_passo_financiamento` agora sonda antes de levantar o erro tecnico. Regressao:
+`test_recusa_tardia_no_financiamento_nao_vira_valor_venda_nao_aplicou`.
+
+Cuidado ao mexer: o par negativo
+(`test_campo_de_valor_vazio_sem_recusa_continua_erro_tecnico`) existe porque
+transformar toda falha do campo em recusa e pior que o bug. E `MagicMock()` cru
+nao serve de pagina nesses testes — `count()` dele nao e zero, entao a sonda
+"acha" recusa em qualquer tela. Declare `get_by_text.return_value.count.return_value = 0`.
 
 Primos: [[2026-09-06-motrix-recusa-sem-motivo-e-200-com-lista-vazia]] — lá a
 recusa era lista vazia sem frase; aqui a frase existe mas o erro genérico a

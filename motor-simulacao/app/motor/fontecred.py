@@ -877,6 +877,11 @@ class FontecredDriver(PlaywrightBankDriver):
         # seguia ate morrer no "Simular", 90s depois, culpando a tela errada.
         lido = re.sub(r"\D", "", valor_box.input_value() or "")
         if lido != re.sub(r"\D", "", valor_fmt):
+            # O "overlay" do comentário acima costuma SER o modal de recusa: ele
+            # chega async e pode passar depois da sonda do passo do veículo
+            # (sim 3244929f, 20/09). Recusa antes do erro técnico — a mesma ordem
+            # dos outros quatro pontos de sonda deste driver.
+            self._levantar_se_recusado(page)
             raise ErroTransitorio(
                 "valor_venda_nao_aplicou",
                 "campo Valor de venda nao ficou preenchido (provavel overlay no formulario)",
