@@ -402,7 +402,7 @@ class PlaywrightBankDriver(ABC):
         return browser_ctx
 
     def _assert_portal_acessivel(self, page) -> None:
-        """Detecta WAF/Akamai Access Denied e falha com código legível."""
+        """Detecta WAF (Akamai, Cloudflare) e falha com código legível."""
         try:
             titulo = (page.title() or "").strip()
             url = page.url or ""
@@ -410,6 +410,22 @@ class PlaywrightBankDriver(ABC):
         except Exception:
             return
         snip = f"{titulo}\n{url}\n{html[:4000]}"
+        # Cloudflare barra na borda: a resposta vem dela e o portal nem viu o
+        # acesso. Sem esta assinatura o driver ficava procurando o campo de
+        # e-mail numa página de aviso e saía `login_timeout` (Fontecred, 19-20/09).
+        # Casamos a página de bloqueio, não a marca: o portal fica ATRÁS da
+        # Cloudflare e a página boa também carrega script dela.
+        if (
+            "Sorry, you have been blocked" in snip
+            or "Attention Required! | Cloudflare" in snip
+            or "error code: 1020" in snip.lower()
+        ):
+            raise IntervencaoNecessaria(
+                "portal_bloqueado",
+                "Cloudflare do banco bloqueou a saída de rede antes da tela de "
+                "login: nenhum acesso foi tentado. O Ray ID está no print do "
+                "evento e identifica a regra no painel do banco.",
+            )
         if (
             "Access Denied" in snip
             or "errors.edgesuite" in snip

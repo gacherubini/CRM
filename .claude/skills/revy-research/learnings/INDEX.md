@@ -81,3 +81,4 @@ escrever migration com `batch_alter_table`.
 | print de diagnostico do driver mostra a tela errada, ou a resposta do portal nao aparece no screenshot | `2026-09-19-print-do-driver-sai-da-tela-errada.md` |
 | driver preenche campo com mascara e o portal reclama do valor, ou o passo SEGUINTE morre em campo_nao_encontrado | `2026-09-19-campo-mascarado-aceita-menos-do-que-voce-digitou.md` |
 | Bradesco sai com captcha_login / "Erro ao tentar verificar o reCAPTCHA" e voce vai trocar de IP, limpar sessao, mexer no navegador ou no timing do grecaptcha | `2026-09-19-recaptcha-do-bradesco-cinco-suspeitos-eliminados.md` |
+| Fontecred (ou outro portal) sai `login_timeout` e voce vai mexer no timing, no seletor ou na credencial | `2026-09-20-login-timeout-do-fontecred-era-bloqueio-da-cloudflare.md` |

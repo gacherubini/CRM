@@ -1,6 +1,6 @@
 # portal-gestao · 185 rotas · 27 modelos · 6 workers · 38 flags · 28 migrations · 63 templates
 
-Gerado de `c45b611`. NAO editar a mao — saida de `gerar_mapa.py`.
+Gerado de `e7354f4`. NAO editar a mao — saida de `gerar_mapa.py`.
 Migration head: `0028_simulacao_ordem_bancos`
 
 ## Rotas
