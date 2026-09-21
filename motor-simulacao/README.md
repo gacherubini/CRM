@@ -34,6 +34,22 @@ aqui** — cifradas — e em nenhum outro produto.
   título responde "visível" e o clique seguinte estoura o timeout sem explicação. Para saber
   se um diálogo está aberto, meça a altura dele. Detalhe e receita de diagnóstico:
   `.claude/skills/revy-research/learnings/2026-09-04-is-visible-mente-com-modal-recortado.md`.
+- **`login_timeout` pode ser bloqueio na borda, não demora.** Em 19–20/09 o Fontecred
+  devolveu a página da Cloudflare ("Sorry, you have been blocked") e o driver ficou
+  procurando o campo de e-mail até estourar — 253s por rodada, duas tentativas, código
+  mentindo. O portal **não viu** a tentativa: a Cloudflare responde antes dele. O
+  `_assert_portal_acessivel` (`app/motor/playwright_base.py`) agora conhece Akamai **e**
+  Cloudflare e levanta `portal_bloqueado`, que não tem retry. Ao acrescentar assinatura
+  nova, case a **página de bloqueio**, nunca a marca: os portais ficam atrás desses CDNs e
+  a página boa também carrega script deles (há teste negativo garantindo).
+- **Recusa de crédito compete com erro técnico — e a recusa vem primeiro.** Bateu três
+  vezes (12/09, 16/09, 20/09): o modal "Este CPF não atende aos critérios mínimos" chega
+  **async**, cobre o formulário, e o passo seguinte falha por outro motivo. O Fontecred tem
+  cinco pontos de sonda por isso — depois da consulta do CPF, no polling do produto, antes
+  do erro de veículo, na espera de ofertas e no passo do financiamento. Regra geral:
+  **qualquer passo que espera a tela mudar é um passo onde a recusa pode ser a resposta.**
+  Recusa não é falha (decisão do dono, 16/09): sai `credito_recusado` e o job fica
+  `concluida`, não `falhou`.
 - **Print de diagnóstico não abre o scroll interno do modal.** O Motrix renderiza a
   recusa abaixo da dobra do dialog: `is_visible()` diz True, mas o
   `mat-mdc-dialog-surface` cobre o aviso e o screenshot sai do formulário em vez da
@@ -225,17 +241,32 @@ Hipótese do card [`docs/fila/2026-09-10-motor-rpa-multiloja-cloud.md`](../docs/
 o browser segue no Fly e só o IP que o banco vê muda. Vale para os drivers Playwright
 (`_launch_browser`); os drivers de API (httpx) e a Machines API **não** passam pelo proxy.
 
-| Secret (`motor2037`) | Valor | Efeito |
+| Variável | Valor | Efeito |
 |---|---|---|
 | `MOTOR_PROXY_URL` | `http://usuario:senha@host:porta` (senha com URL-encoding) | Chromium sai pelo proxy e o WebRTC não abre UDP direto |
 | `MOTOR_PROXY_EXPECTED_IP` | o IP contratado | antes do portal, abre `api.ipify.org` pelo browser; diferente ou sem resposta → `saida_de_rede_divergente` / `proxy_indisponivel` (`aguardando_intervencao`, sem retry) |
 
-- Vazios = comportamento de antes. Ligue os **dois** juntos: sem o esperado, secret
-  esquecido vira login no banco pelo IP do Fly sem ninguém ver.
+**Vão por machine, não por secret do app.** Secret em `motor2037` vale para os seis
+workers, e o desenho é um IP por loja/banco. Ligue só no worker do banco:
+`fly machine update <id> -a motor2037 --env MOTOR_PROXY_URL=... --env
+MOTOR_PROXY_EXPECTED_IP=... --skip-start -y`. `--env` faz merge e preserva o resto;
+rollback é o mesmo comando com as duas chaves vazias.
+
+- Vazios = comportamento de antes. Ligue os **dois** juntos: sem o esperado, proxy caído
+  ou variável esquecida vira login no banco pelo IP do Fly sem ninguém ver.
 - SOCKS5 com senha é recusado na partida: o Chromium não autentica SOCKS5.
 - Proxy de ISP bloqueia banco até a verificação de identidade no fornecedor (IPRoyal: KYC).
   Antes dela, a conferência passa e o portal falha — não é bug do driver.
 - Trocar a saída pode invalidar o `storage_state` salvo. Meça sessão fria e quente separadas.
+- **Medido em 20/09: resolve bloqueio de rede, não resolve reputação de navegador.** O
+  Fontecred estava barrado pela Cloudflare desde 19/09 (funcionava no mesmo IP do Fly às
+  14:13, bloqueado às 16:49 — endereço queimado por volume, não ban de ASN). Com saída
+  residencial BR (`hosting:false`), `login_confirmado` em três rodadas seguidas. O mesmo
+  proxy **não** mexeu no reCAPTCHA do Bradesco, onde o IP já tinha sido eliminado por
+  medição. Antes de comprar IP, saiba qual dos dois problemas você tem.
+- Sticky é ponte, não destino: a janela conta do primeiro uso e, quando o IP gira, toda
+  rodada morre em `saida_de_rede_divergente` **antes** do portal — falha barata, nenhum
+  login gasto. Destino é ISP dedicado por loja.
 
 ## Worker em IP residencial — PLANEJADO, não implementado
 

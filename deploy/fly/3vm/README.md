@@ -64,6 +64,18 @@ bash deploy/fly/down-all.sh --3vm --yes  # stop os always-on E motor2037
 
 ## Deploy
 
+**O caminho normal é o push.** `.github/workflows/deploy-fly.yml` sobe `app2037` e
+`motor2037` no merge para a `main`, com rollback automático se o smoke do `/healthz`
+falhar. Os comandos abaixo são para rodar à mão quando o CI não serve.
+
+> **Armadilha do gatilho (medida em 20/09):** o job `decidir` compara
+> `github.event.before..github.sha`, mas o checkout é `fetch-depth: 2` — num push de dois
+> ou mais commits o SHA base não existe no clone raso e ele cai no fallback
+> `HEAD~1 HEAD`. Se o **último** commit do push não tocar em código de produto (um
+> `docs:` por cima de um `fix:`, por exemplo), os dois jobs são **pulados em silêncio**:
+> o run fecha verde em ~10s sem deployar nada. Confira o resumo do run; para forçar,
+> `gh workflow run deploy-fly.yml -f alvo=ambos`.
+
 ```bash
 # App bundle (portal + revy-trafego + chatbot + estoque + catálogo + motor-api)
 fly deploy . -a app2037 -c deploy/fly/3vm/fly.app.toml --ha=false
@@ -79,8 +91,11 @@ fly deploy . -a motor2037 -c deploy/fly/3vm/fly.worker.toml --build-only
 
 > **O deploy do `motor2037` não atualiza os workers de banco** (`motor-worker-bradesco`,
 > `-santander`, `-fontecred`, `-pan`): foram criados pela Machines API, sem process group, e
-> o `[env]` do `fly.worker.toml` não chega neles. Depois do deploy, em cada um:
-> `fly machine update <id> -a motor2037 --image <tag nova de fly image show> --env ... --skip-start -y`.
+> o `[env]` do `fly.worker.toml` não chega neles. **Vale igual para o deploy pelo CI** — ele
+> só imprime um lembrete no resumo do run. Depois do deploy, em cada um:
+> `fly machine update <id> -a motor2037 --image <tag nova> --env ... --skip-start -y`.
+> A tag nova sai de `fly image show -a motor2037`, ou da coluna IMAGE da machine de seed
+> (`dark-waterfall-6402`) em `fly machine list -a motor2037` — é ela que o deploy atualiza.
 > Detalhe e verificação: `.claude/skills/revy-research/learnings/2026-09-12-fly-deploy-nao-atualiza-worker-por-banco.md`.
 
 O deploy usa a **árvore local**, não o commit — commite antes, senão prod e repo divergem.
